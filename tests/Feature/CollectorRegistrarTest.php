@@ -17,7 +17,7 @@ it("adds Pollora's and WordPress's tabs", function (): void {
 
     registrar()->register($debugbar);
 
-    foreach (['pollora', 'wp_request', 'wp_queries', 'wp_hooks', 'wp_timeline'] as $name) {
+    foreach (['pollora', 'pollora_doctor', 'wp_request', 'wp_queries', 'wp_hooks', 'wp_timeline', 'wp_http', 'wp_cache', 'wp_capabilities', 'wp_blocks', 'wp_assets', 'wp_languages'] as $name) {
         expect($debugbar->hasCollector($name))->toBeTrue();
     }
 });

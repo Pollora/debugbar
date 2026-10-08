@@ -6,6 +6,8 @@ namespace Pollora\Debugbar\Collectors;
 
 use Pollora\Debugbar\Collector;
 use Pollora\Debugbar\Origin;
+use Pollora\Debugbar\Recording\QueryTracer;
+use Pollora\Debugbar\Support\Components;
 use Pollora\Debugbar\Widget;
 
 /**
@@ -14,7 +16,9 @@ use Pollora\Debugbar\Widget;
  * Laravel Debugbar only sees Laravel's PDO connection; WordPress talks to the
  * same database through its own mysqli one. With `SAVEQUERIES` on, `$wpdb`
  * keeps each query with its time and a caller string, read here once, at the
- * end of the request.
+ * end of the request. With the query tracer on, each query also carries its
+ * full backtrace, error and row count, and is attributed to a component —
+ * shown as the SQL widget's connection, so its filter links group by it.
  */
 final class WpQueriesCollector extends Collector
 {
@@ -27,6 +31,8 @@ final class WpQueriesCollector extends Collector
         private readonly ?float $slowThreshold = null,
         private readonly int $softLimit = 100,
         private readonly int $hardLimit = 500,
+        private readonly ?Components $components = null,
+        private readonly ?QueryTracer $tracer = null,
     ) {}
 
     public function getName(): string
@@ -71,9 +77,13 @@ final class WpQueriesCollector extends Collector
             ? trim($wp_the_query->request)
             : null;
 
+        $this->tracer?->completePrevious();
+        $queries = is_object($wpdb) && isset($wpdb->queries) && is_array($wpdb->queries) ? $wpdb->queries : $queries;
+
         $formatter = $this->getDataFormatter();
         $statements = [];
         $total = 0.0;
+        $failed = 0;
 
         foreach (array_values($queries) as $index => $query) {
             if ($index >= $this->hardLimit) {
@@ -82,8 +92,21 @@ final class WpQueriesCollector extends Collector
 
             $sql = trim((string) ($query[0] ?? ''));
             $duration = (float) ($query[1] ?? 0);
-            $frames = $index < $this->softLimit ? $this->frames((string) ($query[2] ?? '')) : [];
+            $traced = is_array($query[4] ?? null) && is_array($query[4][QueryTracer::KEY] ?? null) ? $query[4][QueryTracer::KEY] : null;
             $total += $duration;
+
+            if ($traced !== null && ($traced['frames'] ?? []) !== []) {
+                $frames = array_map(fn (array $frame): string => sprintf('%s — %s:%d', $frame['call'], $this->relativePath($frame['file']), $frame['line']), $traced['frames']);
+                $component = $this->components?->ofTrace($traced['frames']);
+                $source = $traced['frames'][0]['call'];
+            } else {
+                $frames = $index < $this->softLimit ? $this->frames((string) ($query[2] ?? '')) : [];
+                $component = null;
+                $source = $frames[0] ?? '';
+            }
+
+            $error = is_string($traced['error'] ?? null) ? $traced['error'] : null;
+            $failed += $error !== null ? 1 : 0;
 
             $statements[] = [
                 'sql' => $sql,
@@ -92,15 +115,15 @@ final class WpQueriesCollector extends Collector
                 'duration' => $duration,
                 'duration_str' => $formatter->formatDuration($duration),
                 'memory_str' => '',
-                'row_count' => null,
-                'is_success' => true,
+                'row_count' => is_int($traced['rows'] ?? null) ? $traced['rows'] : null,
+                'is_success' => $error === null,
                 'error_code' => null,
-                'error_message' => null,
+                'error_message' => $error,
                 'backtrace' => $frames,
-                'filename' => ($sql === $mainQuery ? 'main query · ' : '').($frames[0] ?? ''),
+                'filename' => ($sql === $mainQuery ? 'main query · ' : '').$source,
                 'xdebug_link' => null,
                 'slow' => $this->slowThreshold !== null && $duration * 1000 >= $this->slowThreshold,
-                'connection' => 'wpdb',
+                'connection' => $component !== null ? "wpdb · {$component}" : 'wpdb',
             ];
         }
 
@@ -116,7 +139,7 @@ final class WpQueriesCollector extends Collector
         return [
             'nb_statements' => count($statements),
             'nb_excluded_statements' => max(0, count($queries) - count($statements)),
-            'nb_failed_statements' => 0,
+            'nb_failed_statements' => $failed,
             'accumulated_duration' => $total,
             'accumulated_duration_str' => $formatter->formatDuration($total),
             'memory_usage_str' => '',

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Pollora\Debugbar\Http;
 
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
+use Fruitcake\LaravelDebugbar\LaravelHttpDriver;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Keeps the requests WordPress answers and then exits from — REST and
@@ -16,6 +18,11 @@ use Fruitcake\LaravelDebugbar\LaravelDebugbar;
  * about them. Here the request id goes out in the `phpdebugbar-id` header
  * before any output, and the data is collected and stored at `shutdown`. The
  * bar's fetch and XHR capture then lists the call like any other.
+ *
+ * `wp_redirect()` is followed by `exit` too. The request is stacked as
+ * Debugbar stacks a Laravel redirect, so the next page shows both: its HTTP
+ * driver can only set its cookie on a Laravel response, so it is given one,
+ * and the cookie is sent by hand.
  */
 final class WordPressExitResponder
 {
@@ -37,6 +44,52 @@ final class WordPressExitResponder
         add_filter('rest_post_dispatch', $this->tagRestResponse(...), 10, 1);
         add_action('admin_init', $this->tagAjaxResponse(...), 0, 0);
         add_action('shutdown', $this->collect(...), 0, 0);
+        add_filter('wp_redirect', function (mixed $location, mixed $status): mixed {
+            if (is_string($location) && $location !== '') {
+                $this->stackRedirect($location, (int) $status);
+            }
+
+            return $location;
+        }, PHP_INT_MAX, 2);
+    }
+
+    /**
+     * Keep this request for the page the redirect leads to.
+     */
+    public function stackRedirect(string $location, int $status): void
+    {
+        $debugbar = ($this->debugbar)();
+
+        if (! $debugbar instanceof LaravelDebugbar) {
+            return;
+        }
+
+        $debugbar->addMessage(sprintf('wp_redirect() %d to %s', $status, $location), 'redirect');
+
+        $driver = $debugbar->getHttpDriver();
+
+        if (headers_sent() || ! $driver instanceof LaravelHttpDriver) {
+            return;
+        }
+
+        $response = new Response;
+
+        // A debugging tool must never break the redirect it watches
+        try {
+            ($this->prepare)($debugbar);
+            $driver->setResponse($response);
+            $debugbar->stackData();
+        } catch (\Throwable $throwable) {
+            report($throwable);
+
+            return;
+        } finally {
+            $driver->setResponse(null);
+        }
+
+        foreach ($response->headers->getCookies() as $cookie) {
+            header('Set-Cookie: '.$cookie, false);
+        }
     }
 
     /**
@@ -87,10 +140,14 @@ final class WordPressExitResponder
             return;
         }
 
-        ($this->prepare)($debugbar);
+        try {
+            ($this->prepare)($debugbar);
 
-        // getData() collects, and stores, only when nothing has been collected yet.
-        $debugbar->getData();
+            // getData() collects, and stores, only when nothing has been collected yet.
+            $debugbar->getData();
+        } catch (\Throwable $throwable) {
+            report($throwable);
+        }
     }
 
     private function storingDebugbar(): ?LaravelDebugbar

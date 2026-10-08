@@ -27,6 +27,13 @@ return [
     | wp_queries   $wpdb queries (turns SAVEQUERIES on)
     | wp_hooks     Hooks that ran and the callbacks Pollora registered
     | wp_timeline  WordPress phases on Debugbar's timeline
+    | wp_http      HTTP calls made through wp_remote_*
+    | wp_cache     Object cache, transients set, OPcache
+    | wp_capabilities  current_user_can() checks, aggregated
+    | wp_blocks    Blocks rendered and block bindings resolved
+    | wp_assets    Scripts, styles, script modules and Vite containers
+    | wp_languages Locale and translation files
+    | doctor       A button that runs pollora:doctor's web checks on demand
     | bridges      pollora/debugbar/* and Query Monitor's qm/* actions
     |
     */
@@ -37,6 +44,13 @@ return [
         'wp_queries' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_QUERIES', true),
         'wp_hooks' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_HOOKS', true),
         'wp_timeline' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_TIMELINE', true),
+        'wp_http' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_HTTP', true),
+        'wp_cache' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_CACHE', true),
+        'wp_capabilities' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_CAPABILITIES', true),
+        'wp_blocks' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_BLOCKS', true),
+        'wp_assets' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_ASSETS', true),
+        'wp_languages' => env('DEBUGBAR_POLLORA_COLLECTORS_WP_LANGUAGES', true),
+        'doctor' => env('DEBUGBAR_POLLORA_COLLECTORS_DOCTOR', true),
         'bridges' => env('DEBUGBAR_POLLORA_COLLECTORS_BRIDGES', true),
     ],
 
@@ -49,6 +63,13 @@ return [
             'soft_limit' => (int) env('DEBUGBAR_POLLORA_WP_QUERIES_SOFT_LIMIT', 100),
             // Past this many queries, the rest are left out
             'hard_limit' => (int) env('DEBUGBAR_POLLORA_WP_QUERIES_HARD_LIMIT', 500),
+            // Full backtrace, error, rows and component for each query
+            'trace' => env('DEBUGBAR_POLLORA_WP_QUERIES_TRACE', true),
+        ],
+
+        'wp_capabilities' => [
+            // Who asked: a backtrace per distinct check
+            'backtrace' => env('DEBUGBAR_POLLORA_WP_CAPABILITIES_BACKTRACE', false),
         ],
 
         'wp_hooks' => [

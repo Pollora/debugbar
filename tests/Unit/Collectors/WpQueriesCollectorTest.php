@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use DebugBar\DataFormatter\DataFormatter;
 use Pollora\Debugbar\Collectors\WpQueriesCollector;
+use Pollora\Debugbar\Recording\QueryTracer;
+use Pollora\Debugbar\Support\Components;
 
 /**
  * WordPress keeps each query as [sql, seconds, caller, start, data] once
@@ -61,4 +63,33 @@ it('shows nothing when WordPress kept no queries', function (): void {
     unset($GLOBALS['wpdb']);
 
     expect(queriesFrom(new WpQueriesCollector)['nb_statements'])->toBe(0);
+});
+
+it('uses the tracer\'s backtrace, error and rows, and groups queries by component', function (): void {
+    $GLOBALS['wpdb']->queries = [[
+        'SELECT * FROM wp_nope', 0.001, 'ignored caller string', 1.0,
+        [QueryTracer::KEY => [
+            'frames' => [
+                ['file' => '/site/public/cms/wp-includes/option.php', 'line' => 12, 'call' => 'get_option'],
+                ['file' => '/site/public/content/plugins/acme/acme.php', 'line' => 30, 'call' => 'acme_boot'],
+            ],
+            'error' => "Table 'wp_nope' doesn't exist",
+            'rows' => 0,
+        ]],
+    ]];
+
+    $components = new Components([
+        '/site/public/content/plugins/' => ['kind' => 'plugin', 'name' => null],
+        '/site/public/cms/' => ['kind' => 'core', 'name' => ''],
+    ]);
+
+    $data = queriesFrom(new WpQueriesCollector(components: $components));
+    $statement = $data['statements'][0];
+
+    expect($statement['connection'])->toBe('wpdb · plugin: acme')
+        ->and($statement['is_success'])->toBeFalse()
+        ->and($statement['error_message'])->toBe("Table 'wp_nope' doesn't exist")
+        ->and($statement['row_count'])->toBe(0)
+        ->and($statement['backtrace'][1])->toBe('acme_boot — /site/public/content/plugins/acme/acme.php:30')
+        ->and($data['nb_failed_statements'])->toBe(1);
 });
