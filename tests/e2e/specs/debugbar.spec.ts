@@ -160,3 +160,13 @@ test('lists the REST calls the block editor makes in the bar of its admin page',
     await expect.poll(async () => page.evaluate(() => Object.keys((window as any).phpdebugbar.datasets).length), { timeout: 15_000 })
         .toBeGreaterThan(1);
 });
+
+test('prints no second bar inside the Site Editor canvas', async ({ page }) => {
+    await logIn(page);
+    await page.goto('cms/wp-admin/site-editor.php');
+    await debugbar(page);
+
+    const canvas = page.frameLocator('iframe[name="editor-canvas"], iframe').first();
+    await expect(canvas.locator('body')).toBeVisible({ timeout: 15_000 });
+    await expect(canvas.locator('.phpdebugbar')).toHaveCount(0);
+});

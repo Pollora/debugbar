@@ -69,6 +69,15 @@ final class DebugbarServiceProvider extends ServiceProvider
 
         $admin = $config->get('debugbar-pollora.admin.enabled', true) && AdminBarRenderer::isAdminPage();
 
+        $this->app->booting(function () use ($config): void {
+            // The Site Editor and the Customizer show the front end in an
+            // iframe: the request is still stored, but a second bar inside
+            // the canvas would cover the page being edited
+            if (! $config->get('debugbar-pollora.iframes', false) && $this->app->bound('request') && Activation::isFramed($this->app->make('request'))) {
+                $config->set('debugbar.inject', false);
+            }
+        });
+
         if ($admin) {
             // Debugbar adds its tabs while it boots; by then every provider has
             // registered and its config is merged

@@ -58,6 +58,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Pages inside an iframe
+    |--------------------------------------------------------------------------
+    |
+    | The Site Editor and the Customizer show the front end in an iframe. Those
+    | requests are still stored (open them from the bar's request list), but
+    | no bar is printed inside the frame unless this is true.
+    |
+    */
+
+    'iframes' => env('DEBUGBAR_POLLORA_IFRAMES', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | wp-admin
     |--------------------------------------------------------------------------
     |
