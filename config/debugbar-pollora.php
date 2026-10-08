@@ -23,9 +23,11 @@ return [
     |--------------------------------------------------------------------------
     |
     | pollora      What answered the request, discovery, modules, theme, async
-    | wp_request   Rewrite rule, query vars, main query, conditionals, templates
+    | wp_request   Rewrite rule, query vars, main query, conditionals, templates,
+    |              admin screen, multisite site and switches
     | wp_queries   $wpdb queries (turns SAVEQUERIES on)
-    | wp_hooks     Hooks that ran and the callbacks Pollora registered
+    | wp_hooks     Hooks that ran and the callbacks Pollora registered; with
+    |              options.wp_hooks.timings, a WP Hook timings tab
     | wp_timeline  WordPress phases on Debugbar's timeline
     | wp_http      HTTP calls made through wp_remote_*
     | wp_cache     Object cache, transients set, OPcache
@@ -54,6 +56,22 @@ return [
         'bridges' => env('DEBUGBAR_POLLORA_COLLECTORS_BRIDGES', true),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | wp-admin
+    |--------------------------------------------------------------------------
+    |
+    | WordPress prints admin pages itself, so Laravel Debugbar never shows
+    | there on its own. The bar is printed with the admin footer scripts,
+    | without Debugbar's tabs about a request Laravel answered.
+    |
+    */
+
+    'admin' => [
+        'enabled' => env('DEBUGBAR_POLLORA_ADMIN', true),
+        'hidden_collectors' => ['route', 'views', 'session', 'livewire', 'inertia'],
+    ],
+
     'options' => [
 
         'wp_queries' => [
@@ -75,6 +93,11 @@ return [
         'wp_hooks' => [
             // Count filters too: an `all` listener runs on every apply_filters()
             'count_filters' => env('DEBUGBAR_POLLORA_WP_HOOKS_COUNT_FILTERS', false),
+            // Time every callback (WP Hook timings tab); wraps each callback
+            // in $wp_filter and adds a timer to every call, so off by default
+            'timings' => env('DEBUGBAR_POLLORA_WP_HOOKS_TIMINGS', false),
+            // How many callbacks the timings tab lists, slowest first
+            'timings_limit' => (int) env('DEBUGBAR_POLLORA_WP_HOOKS_TIMINGS_LIMIT', 200),
         ],
 
         'bridges' => [

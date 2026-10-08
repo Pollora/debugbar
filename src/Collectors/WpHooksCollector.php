@@ -7,6 +7,7 @@ namespace Pollora\Debugbar\Collectors;
 use Pollora\Debugbar\Collector;
 use Pollora\Debugbar\Origin;
 use Pollora\Debugbar\Recording\RequestRecorder;
+use Pollora\Debugbar\Recording\TimedCallback;
 use Pollora\Debugbar\Widget;
 
 /**
@@ -76,6 +77,7 @@ final class WpHooksCollector extends Collector
     public static function describe(mixed $callback): string
     {
         return match (true) {
+            $callback instanceof TimedCallback => self::describe($callback->callback),
             is_string($callback) => $callback,
             is_array($callback) && isset($callback[0], $callback[1]) => (is_object($callback[0]) ? $callback[0]::class : (string) $callback[0]).'::'.(string) $callback[1],
             $callback instanceof \Closure => self::describeClosure($callback),
@@ -123,7 +125,12 @@ final class WpHooksCollector extends Collector
     private static function describeClosure(\Closure $closure): string
     {
         $reflection = new \ReflectionFunction($closure);
-        $scope = $reflection->getClosureScopeClass()?->getName();
+        $scopeClass = $reflection->getClosureScopeClass();
+
+        // A file included from a method (a mu-plugin WordPress loads from
+        // Pollora's Bootstrap) gives its closures that class's scope: name
+        // the class only when the closure is written in it
+        $scope = $scopeClass !== null && $scopeClass->getFileName() === $reflection->getFileName() ? $scopeClass->getName() : null;
 
         if (! str_contains($reflection->getName(), '{closure')) {
             return $scope !== null ? "{$scope}::{$reflection->getName()}" : $reflection->getName();

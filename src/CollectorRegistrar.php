@@ -15,6 +15,7 @@ use Pollora\Debugbar\Collectors\WpBlocksCollector;
 use Pollora\Debugbar\Collectors\WpCacheCollector;
 use Pollora\Debugbar\Collectors\WpCapabilitiesCollector;
 use Pollora\Debugbar\Collectors\WpHooksCollector;
+use Pollora\Debugbar\Collectors\WpHookTimingsCollector;
 use Pollora\Debugbar\Collectors\WpHttpCollector;
 use Pollora\Debugbar\Collectors\WpLanguagesCollector;
 use Pollora\Debugbar\Collectors\WpQueriesCollector;
@@ -25,10 +26,12 @@ use Pollora\Debugbar\Recording\AsyncRecorder;
 use Pollora\Debugbar\Recording\BlockRecorder;
 use Pollora\Debugbar\Recording\CacheRecorder;
 use Pollora\Debugbar\Recording\CapabilityRecorder;
+use Pollora\Debugbar\Recording\HookTimer;
 use Pollora\Debugbar\Recording\HttpRecorder;
 use Pollora\Debugbar\Recording\LanguageRecorder;
 use Pollora\Debugbar\Recording\QueryTracer;
 use Pollora\Debugbar\Recording\RequestRecorder;
+use Pollora\Debugbar\Recording\SiteRecorder;
 use Pollora\Debugbar\Support\Components;
 use Pollora\Hook\Domain\Contract\Action;
 use Pollora\Hook\Domain\Contract\Filter;
@@ -117,7 +120,7 @@ final class CollectorRegistrar
         }
 
         if ($on('wp_request')) {
-            $collectors[] = new WpRequestCollector($this->recorder);
+            $collectors[] = new WpRequestCollector($this->recorder, $this->container->make(SiteRecorder::class), $this->container->make(Components::class));
         }
 
         if ($on('wp_queries')) {
@@ -134,6 +137,14 @@ final class CollectorRegistrar
 
         if ($on('wp_hooks')) {
             $collectors[] = new WpHooksCollector($this->recorder, $this->polloraHookServices());
+
+            if ($config->get('debugbar-pollora.options.wp_hooks.timings', false)) {
+                $collectors[] = new WpHookTimingsCollector(
+                    $this->container->make(HookTimer::class),
+                    $this->container->make(Components::class),
+                    (int) $config->get('debugbar-pollora.options.wp_hooks.timings_limit', 200),
+                );
+            }
         }
 
         $components = $this->container->make(Components::class);

@@ -128,3 +128,35 @@ test('runs the doctor on demand from its tab', async ({ page }) => {
     await expect(panel.locator('tr').first()).toBeVisible();
     await expect(panel).toContainText(/\d+ (ok|warning|error)/);
 });
+
+async function logIn(page: Page): Promise<void> {
+    await page.goto('cms/wp-login.php');
+    await page.fill('#user_login', process.env.E2E_ADMIN_USER ?? 'admin');
+    await page.fill('#user_pass', process.env.E2E_ADMIN_PASSWORD ?? 'pollora-ci-password');
+    await page.click('#wp-submit');
+    await page.waitForURL(/wp-admin/);
+}
+
+test('shows the bar on wp-admin pages, with the admin screen and without Laravel-only tabs', async ({ page }) => {
+    await logIn(page);
+    await page.goto('cms/wp-admin/edit.php');
+    const bar = await debugbar(page);
+    // The login redirect is stacked before this page's own request
+    const request = Object.values(bar.datasets).find((dataset) => String(dataset.__meta?.uri ?? '').includes('edit.php'))?.wp_request.data;
+
+    expect(bar.controls).toHaveProperty('wp_request');
+    expect(bar.controls).toHaveProperty('wp_queries');
+    expect(bar.controls).not.toHaveProperty('route');
+    expect(bar.controls).not.toHaveProperty('views');
+    expect(request['Admin page']).toBe('edit.php');
+    expect(JSON.stringify(request['Screen'])).toContain('edit-post');
+});
+
+test('lists the REST calls the block editor makes in the bar of its admin page', async ({ page }) => {
+    await logIn(page);
+    await page.goto('cms/wp-admin/post-new.php');
+    await debugbar(page);
+
+    await expect.poll(async () => page.evaluate(() => Object.keys((window as any).phpdebugbar.datasets).length), { timeout: 15_000 })
+        .toBeGreaterThan(1);
+});

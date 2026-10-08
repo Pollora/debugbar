@@ -7,10 +7,13 @@ namespace Pollora\Debugbar\Collectors;
 use Pollora\Debugbar\Collector;
 use Pollora\Debugbar\Origin;
 use Pollora\Debugbar\Recording\RequestRecorder;
+use Pollora\Debugbar\Recording\SiteRecorder;
+use Pollora\Debugbar\Support\Components;
 
 /**
  * How WordPress understood the request: rewrite rule, query, queried object,
- * conditionals and the template hierarchy it built.
+ * conditionals and the template hierarchy it built; in wp-admin, the screen;
+ * on a multisite, the site and the switches between sites.
  */
 final class WpRequestCollector extends Collector
 {
@@ -30,6 +33,8 @@ final class WpRequestCollector extends Collector
 
     public function __construct(
         private readonly RequestRecorder $recorder,
+        private readonly ?SiteRecorder $sites = null,
+        private readonly ?Components $components = null,
     ) {}
 
     public function getName(): string
@@ -95,6 +100,79 @@ final class WpRequestCollector extends Collector
 
         $data['Template'] = $this->recorder->template() !== null ? $this->relativePath($this->recorder->template()) : null;
         $data['Template hierarchy'] = $this->recorder->hierarchies() !== [] ? $this->recorder->hierarchies() : null;
+
+        return [...$data, ...$this->adminScreen(), ...$this->multisite()];
+    }
+
+    /**
+     * The admin page and screen, as Query Monitor's Admin panel shows them.
+     *
+     * @return array<string, mixed>
+     */
+    private function adminScreen(): array
+    {
+        global $pagenow, $hook_suffix;
+
+        // $pagenow is set once WordPress has parsed the URL; before that,
+        // is_admin() has nothing reliable to say
+        if (! is_string($pagenow) || ! function_exists('is_admin') || ! is_admin() || ! function_exists('get_current_screen')) {
+            return [];
+        }
+
+        $screen = get_current_screen();
+
+        return array_filter([
+            'Admin page' => $pagenow,
+            'Hook suffix' => is_string($hook_suffix) && $hook_suffix !== '' ? $hook_suffix : null,
+            'Screen' => $screen instanceof \WP_Screen ? array_filter([
+                'id' => $screen->id,
+                'base' => $screen->base,
+                'post type' => $screen->post_type,
+                'taxonomy' => $screen->taxonomy,
+                'block editor' => $screen->is_block_editor() ? 'yes' : null,
+            ], static fn (mixed $value): bool => $value !== '' && $value !== null) : null,
+        ], static fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * The site and network that answered, and each switch between sites.
+     *
+     * @return array<string, mixed>
+     */
+    private function multisite(): array
+    {
+        // ms-settings.php sets the network; a single site never has one
+        if (! is_object($GLOBALS['current_site'] ?? null) || ! function_exists('is_multisite') || ! is_multisite()) {
+            return [];
+        }
+
+        $switched = function_exists('ms_is_switched') && ms_is_switched();
+        // While switched, the site that answered is the first one switched away from
+        $stack = $GLOBALS['_wp_switched_stack'] ?? [];
+        $site = $switched && is_array($stack) && isset($stack[0]) ? (int) $stack[0] : get_current_blog_id();
+
+        $data = [
+            'Site' => sprintf('#%d%s', $site, is_main_site($site) ? ' (main site)' : ''),
+            'Network' => function_exists('get_current_network_id') ? '#'.get_current_network_id() : null,
+        ];
+
+        $switches = [];
+
+        foreach ($this->sites?->switches() ?? [] as $switch) {
+            $switches[] = sprintf(
+                '%s #%d → #%d%s',
+                $switch['context'],
+                $switch['from'],
+                $switch['to'],
+                $this->components instanceof Components && $switch['frames'] !== [] ? ' ('.$this->components->ofTrace($switch['frames']).')' : '',
+            );
+        }
+
+        $data['Site switches'] = $switches !== [] ? $switches : 'none';
+
+        if ($switched) {
+            $data['Still switched'] = sprintf('yes, to #%d: restore_current_blog() was not called for every switch_to_blog()', get_current_blog_id());
+        }
 
         return $data;
     }
