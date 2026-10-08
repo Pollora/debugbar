@@ -53,3 +53,11 @@ it('prefers a plugin to a theme when both are in the trace', function (): void {
         ['file' => '/site/public/content/plugins/acme/acme.php'],
     ]))->toBe('plugin: acme');
 });
+
+it('keeps looking for directories until WordPress has defined where plugins live', function (): void {
+    // No directories given and no WordPress here: nothing can be known, and nothing is kept
+    $components = new Components;
+
+    expect($components->of('/anywhere/plugins/acme/acme.php'))->toBe('unknown')
+        ->and((new ReflectionProperty(Components::class, 'directories'))->getValue($components))->toBeNull();
+});

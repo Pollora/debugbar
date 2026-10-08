@@ -39,7 +39,10 @@ final class DebugbarServiceProvider extends ServiceProvider
         $this->app->singleton(RequestRecorder::class);
         $this->app->singleton(CollectorRegistrar::class);
         $this->app->singleton(Components::class, fn (): Components => new Components);
-        $this->app->singleton(QueryTracer::class, fn ($app): QueryTracer => new QueryTracer((int) $app->make('config')->get('debugbar-pollora.options.wp_queries.soft_limit', 100)));
+        $this->app->singleton(QueryTracer::class, fn ($app): QueryTracer => new QueryTracer(
+            (int) $app->make('config')->get('debugbar-pollora.options.wp_queries.soft_limit', 100),
+            $app->make(Components::class),
+        ));
         $this->app->singleton(HttpRecorder::class);
         $this->app->singleton(CacheRecorder::class);
         $this->app->singleton(LanguageRecorder::class);

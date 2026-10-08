@@ -51,7 +51,19 @@ final class Components
             return 'unknown';
         }
 
-        return $this->cache[$file] ??= $this->label($this->owner($file));
+        if (isset($this->cache[$file])) {
+            return $this->cache[$file];
+        }
+
+        $label = $this->label($this->owner($file));
+
+        // Not kept while WordPress has not defined its directories yet: the
+        // same file belongs to a plugin once it has
+        if ($this->directories !== null) {
+            $this->cache[$file] = $label;
+        }
+
+        return $label;
     }
 
     /**
@@ -147,16 +159,15 @@ final class Components
             $add(get_theme_root(), 'theme');
         }
 
-        if (function_exists('base_path')) {
+        // Outside a Laravel application (a unit test), only WordPress's directories are known
+        try {
             $add(base_path('themes'), 'theme');
             $add(base_path('Modules'), 'module');
             $add(base_path('vendor/pollora'), 'pollora', '');
             $add(base_path('vendor/laravel'), 'laravel', '');
             $add(base_path('vendor'), 'vendor');
-        }
-
-        if (function_exists('app_path')) {
             $add(app_path(), 'app', '');
+        } catch (\Throwable) {
         }
 
         if (defined('ABSPATH')) {
@@ -165,6 +176,12 @@ final class Components
 
         uksort($directories, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
 
-        return $this->directories = $directories;
+        // The first queries run before WordPress defines where plugins and
+        // themes live; keep looking until it has
+        if (defined('WP_PLUGIN_DIR') && function_exists('get_theme_root')) {
+            $this->directories = $directories;
+        }
+
+        return $directories;
     }
 }

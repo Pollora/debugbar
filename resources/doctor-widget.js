@@ -46,10 +46,19 @@
 
                 try {
                     const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-                    const body = await response.json();
+                    const text = await response.text();
+                    const isJson = (response.headers.get('content-type') || '').includes('json');
+
+                    // A proxy or a restarting server answers with plain text or
+                    // HTML: say what came back rather than a JSON syntax error
+                    if (! isJson) {
+                        throw new Error('HTTP ' + response.status + ': ' + text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
+                    }
+
+                    const body = JSON.parse(text);
 
                     if (! response.ok) {
-                        throw new Error(body.message || response.status);
+                        throw new Error(body.message || 'HTTP ' + response.status);
                     }
 
                     const counts = {};

@@ -267,10 +267,19 @@ final class PolloraCollector extends Collector
             }
         }
 
+        global $wpdb;
+
         return [
             'environment' => function_exists('wp_get_environment_type') ? wp_get_environment_type() : null,
             'constants' => $constants,
             'drop-ins' => $dropIns === [] ? 'none' : implode(', ', $dropIns),
+            'database server' => is_object($wpdb) && method_exists($wpdb, 'db_server_info') ? (string) $wpdb->db_server_info() : null,
+            'memory limit' => sprintf(
+                'PHP %s, WordPress %s',
+                (string) ini_get('memory_limit'),
+                defined('WP_MEMORY_LIMIT') ? (string) WP_MEMORY_LIMIT : '—',
+            ),
+            'web server' => is_string($_SERVER['SERVER_SOFTWARE'] ?? null) ? $_SERVER['SERVER_SOFTWARE'] : null,
         ];
     }
 

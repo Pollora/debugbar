@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pollora\Debugbar\Recording;
 
+use Pollora\Debugbar\Support\Components;
+
 /**
  * Adds what `SAVEQUERIES` leaves out to each query `$wpdb` keeps: the full
  * backtrace, the error and the number of rows.
@@ -23,12 +25,17 @@ final class QueryTracer
     /** Key of the data this tracer adds to each query's custom data. */
     public const string KEY = 'pollora_debugbar';
 
-    private const int FRAMES = 25;
+    /** Frames read to find who asked for the query. */
+    private const int FRAMES = 30;
+
+    /** Frames kept to show it: the innermost, where the reader looks first. */
+    private const int SHOWN_FRAMES = 10;
 
     private bool $installed = false;
 
     public function __construct(
         private readonly int $softLimit = 100,
+        private readonly ?Components $components = null,
     ) {}
 
     public function install(): void
@@ -77,8 +84,20 @@ final class QueryTracer
         $data = is_array($data) ? $data : [];
         $count = is_object($wpdb) && isset($wpdb->queries) && is_array($wpdb->queries) ? count($wpdb->queries) : 0;
 
+        if ($count >= $this->softLimit) {
+            $data[self::KEY] = ['frames' => []];
+
+            return $data;
+        }
+
+        // Attributed from the whole trace, shown from its innermost part: a
+        // page of WooCommerce runs a hundred queries, and full traces made
+        // most of the bar's weight
+        $frames = $this->frames();
+
         $data[self::KEY] = [
-            'frames' => $count < $this->softLimit ? $this->frames() : [],
+            'frames' => array_slice($frames, 0, self::SHOWN_FRAMES),
+            'component' => $this->components?->ofTrace($frames),
         ];
 
         return $data;

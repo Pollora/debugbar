@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Brain\Monkey\Filters;
 use Pollora\Debugbar\Recording\QueryTracer;
+use Pollora\Debugbar\Support\Components;
 
 /**
  * @return array<string, callable>
@@ -71,4 +72,14 @@ it('completes a query once, so a later flush does not overwrite it', function ()
     $tracer->completePrevious();
 
     expect($GLOBALS['wpdb']->queries[0][4][QueryTracer::KEY])->toMatchArray(['rows' => 3, 'error' => null]);
+});
+
+it('attributes a query from its whole trace but keeps only the innermost frames to show', function (): void {
+    $components = new Components([dirname(__DIR__, 3).'/' => ['kind' => 'app', 'name' => '']]);
+    $hooks = tracerHooks(new QueryTracer(components: $components));
+
+    $data = $hooks['log_query_custom_data']([])[QueryTracer::KEY];
+
+    expect(count($data['frames']))->toBeLessThanOrEqual(10)
+        ->and($data['component'])->toBe('app');
 });

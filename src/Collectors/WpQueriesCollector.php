@@ -97,7 +97,7 @@ final class WpQueriesCollector extends Collector
 
             if ($traced !== null && ($traced['frames'] ?? []) !== []) {
                 $frames = array_map(fn (array $frame): string => sprintf('%s — %s:%d', $frame['call'], $this->relativePath($frame['file']), $frame['line']), $traced['frames']);
-                $component = $this->components?->ofTrace($traced['frames']);
+                $component = is_string($traced['component'] ?? null) ? $traced['component'] : $this->components?->ofTrace($traced['frames']);
                 $source = $traced['frames'][0]['call'];
             } else {
                 $frames = $index < $this->softLimit ? $this->frames((string) ($query[2] ?? '')) : [];
