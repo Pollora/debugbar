@@ -93,7 +93,7 @@ final class WpRequestCollector extends Collector
             $data['Conditionals'] = implode(', ', $this->trueConditionals());
         }
 
-        $data['Template'] = $this->recorder->template() !== null ? $this->relative($this->recorder->template()) : null;
+        $data['Template'] = $this->recorder->template() !== null ? $this->relativePath($this->recorder->template()) : null;
         $data['Template hierarchy'] = $this->recorder->hierarchies() !== [] ? $this->recorder->hierarchies() : null;
 
         return $data;
@@ -130,12 +130,5 @@ final class WpRequestCollector extends Collector
             $object instanceof \WP_Post_Type => sprintf('post type %s', $object->name),
             default => null,
         };
-    }
-
-    private function relative(string $path): string
-    {
-        $base = function_exists('base_path') ? rtrim(base_path(), '/').'/' : '';
-
-        return $base !== '' && str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
     }
 }

@@ -20,13 +20,22 @@ It brings `fruitcake/laravel-debugbar` with it. Nothing runs unless Laravel Debu
 
 | Tab | Origin | Shows |
 | --- | --- | --- |
-| Pollora | Pollora | What answered (`Route::wp()`, the template hierarchy and its view, a Laravel route, or WordPress alone), versions, discovery, modules, theme, async actions |
+| Pollora | Pollora | What answered (`Route::wp()`, the template hierarchy and its view, a Laravel route, or WordPress alone), versions, discovery, modules, theme, async actions registered and queued, WordPress constants and drop-ins |
+| Doctor | Pollora | A **Run doctor** button: `pollora:doctor`'s web checks on demand, errors first |
 | WP Request | WordPress | Rewrite rule, query vars, queried object, main query, true conditionals, template and hierarchy candidates |
-| WP Queries | WordPress | `$wpdb` queries with time, caller, duplicates, slow ones and the main query (turns `SAVEQUERIES` on) |
+| WP Queries | WordPress | `$wpdb` queries with time, full backtrace, rows, errors, duplicates, slow ones and the main query, grouped by component (core, plugin, theme…) |
 | WP Hooks | WordPress | Hooks that ran, their callbacks, and those Pollora registered |
+| WP HTTP | WordPress | `wp_remote_*` calls: result, time, transport, who made them |
+| WP Cache | WordPress | Object cache hits and misses, transients set, OPcache |
+| WP Capabilities | WordPress | `current_user_can()` checks, each distinct check once with its count |
+| WP Blocks | WordPress | Blocks rendered by type with their time, Pollora's Blade blocks, block bindings |
+| WP Assets | WordPress | Scripts, styles and script modules, header or footer, missing dependencies, Vite builds |
+| WP Languages | WordPress | Locale and the translation files looked for |
 | Timeline | WordPress | `muplugins_loaded` to `shutdown`, beside Debugbar's own measures |
 
-REST and admin-ajax requests end with `exit`, which Laravel Debugbar never sees: this package stores them and sends the `phpdebugbar-id` header, so they appear in the bar's request list of the page that made the call.
+REST and admin-ajax requests end with `exit`, which Laravel Debugbar never sees: this package stores them and sends the `phpdebugbar-id` header, so they appear in the bar's request list of the page that made the call. A `wp_redirect()` keeps its request for the page it leads to.
+
+WordPress queries are traced through core's `log_query_custom_data` and `query` filters, so this works with any `db.php` drop-in, Pollora's included.
 
 Configuration: `php artisan vendor:publish --tag=debugbar-pollora-config`.
 

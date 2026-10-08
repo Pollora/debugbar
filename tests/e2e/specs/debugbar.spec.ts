@@ -53,7 +53,7 @@ test('shows the queries WordPress ran and the hooks that fired', async ({ page }
     const data = firstDataset(await debugbar(page));
 
     expect(data.wp_queries.nb_statements).toBeGreaterThan(0);
-    expect(data.wp_queries.statements[0].connection).toBe('wpdb');
+    expect(data.wp_queries.statements[0].connection).toMatch(/^wpdb/);
     expect(data.wp_hooks.data.data.init.calls).toBeGreaterThan(0);
 });
 
@@ -81,4 +81,50 @@ test('shows what a plugin and a package add, labelled as theirs', async ({ page 
     expect(data.messages.messages.map((message: any) => message.message)).toEqual(
         expect.arrayContaining(['Acme cart c-42 rebuilt', 'Written for Query Monitor']),
     );
+});
+
+test('groups WordPress queries by component and keeps their backtrace', async ({ page }) => {
+    await page.goto('');
+    const statements = firstDataset(await debugbar(page)).wp_queries.statements;
+
+    expect(statements.map((statement: any) => statement.connection)).toContain('wpdb · core');
+    expect(statements[0].backtrace.length).toBeGreaterThan(0);
+});
+
+test('lists the HTTP calls, transients and capability checks of the request', async ({ page }) => {
+    await page.goto('');
+    const data = firstDataset(await debugbar(page));
+
+    expect(data.wp_http.data.data['1. GET https://api.acme.test/stock'].result).toBe('200 (answered by pre_http_request)');
+    expect(JSON.stringify(data.wp_cache.data['Transients set'])).toContain('acme_rates');
+    expect(data.wp_capabilities.data.data.edit_posts.result).toBe('refused');
+});
+
+test('shows the blocks of a post and the theme’s Vite build', async ({ page }) => {
+    await page.goto('hello-world/');
+    const data = firstDataset(await debugbar(page));
+
+    expect(data.wp_blocks.data.data['core/paragraph'].count).toBeGreaterThan(0);
+    expect(data.wp_assets.data.data['vite: theme'].note).toBe('build (manifest)');
+});
+
+test('keeps the request WordPress redirected from', async ({ page }) => {
+    await page.goto('?p=1');
+    await expect(page).toHaveURL(/hello-world/);
+
+    await expect.poll(async () => page.evaluate(
+        () => Object.values((window as any).phpdebugbar.datasets).map((dataset: any) => dataset.__meta?.uri),
+    )).toContain('/?p=1');
+});
+
+test('runs the doctor on demand from its tab', async ({ page }) => {
+    await page.goto('');
+    await debugbar(page);
+
+    await page.evaluate(() => (window as any).phpdebugbar.showTab('pollora_doctor'));
+    const panel = page.locator('.phpdebugbar-panel.phpdebugbar-active');
+    await panel.getByRole('button', { name: 'Run doctor' }).click();
+
+    await expect(panel.locator('tr').first()).toBeVisible();
+    await expect(panel).toContainText(/\d+ (ok|warning|error)/);
 });

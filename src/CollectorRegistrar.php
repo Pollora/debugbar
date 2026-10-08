@@ -8,13 +8,28 @@ use DebugBar\DataCollector\DataCollectorInterface;
 use DebugBar\DataCollector\TimeDataCollector;
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
 use Illuminate\Contracts\Container\Container;
+use Pollora\Debugbar\Collectors\DoctorCollector;
 use Pollora\Debugbar\Collectors\PolloraCollector;
+use Pollora\Debugbar\Collectors\WpAssetsCollector;
+use Pollora\Debugbar\Collectors\WpBlocksCollector;
+use Pollora\Debugbar\Collectors\WpCacheCollector;
+use Pollora\Debugbar\Collectors\WpCapabilitiesCollector;
 use Pollora\Debugbar\Collectors\WpHooksCollector;
+use Pollora\Debugbar\Collectors\WpHttpCollector;
+use Pollora\Debugbar\Collectors\WpLanguagesCollector;
 use Pollora\Debugbar\Collectors\WpQueriesCollector;
 use Pollora\Debugbar\Collectors\WpRequestCollector;
 use Pollora\Debugbar\Collectors\WpTimelineCollector;
 use Pollora\Debugbar\Contracts\SectionProvider;
+use Pollora\Debugbar\Recording\AsyncRecorder;
+use Pollora\Debugbar\Recording\BlockRecorder;
+use Pollora\Debugbar\Recording\CacheRecorder;
+use Pollora\Debugbar\Recording\CapabilityRecorder;
+use Pollora\Debugbar\Recording\HttpRecorder;
+use Pollora\Debugbar\Recording\LanguageRecorder;
+use Pollora\Debugbar\Recording\QueryTracer;
 use Pollora\Debugbar\Recording\RequestRecorder;
+use Pollora\Debugbar\Support\Components;
 use Pollora\Hook\Domain\Contract\Action;
 use Pollora\Hook\Domain\Contract\Filter;
 
@@ -98,7 +113,7 @@ final class CollectorRegistrar
         $collectors = [];
 
         if ($on('pollora')) {
-            $collectors[] = new PolloraCollector($this->container);
+            $collectors[] = new PolloraCollector($this->container, $this->container->make(AsyncRecorder::class));
         }
 
         if ($on('wp_request')) {
@@ -112,11 +127,43 @@ final class CollectorRegistrar
                 is_numeric($threshold) ? (float) $threshold : null,
                 (int) $config->get('debugbar-pollora.options.wp_queries.soft_limit', 100),
                 (int) $config->get('debugbar-pollora.options.wp_queries.hard_limit', 500),
+                $this->container->make(Components::class),
+                $config->get('debugbar-pollora.options.wp_queries.trace', true) ? $this->container->make(QueryTracer::class) : null,
             );
         }
 
         if ($on('wp_hooks')) {
             $collectors[] = new WpHooksCollector($this->recorder, $this->polloraHookServices());
+        }
+
+        $components = $this->container->make(Components::class);
+
+        if ($on('wp_http')) {
+            $collectors[] = new WpHttpCollector($this->container->make(HttpRecorder::class), $components);
+        }
+
+        if ($on('wp_cache')) {
+            $collectors[] = new WpCacheCollector($this->container->make(CacheRecorder::class), $components);
+        }
+
+        if ($on('wp_capabilities')) {
+            $collectors[] = new WpCapabilitiesCollector($this->container->make(CapabilityRecorder::class), $components);
+        }
+
+        if ($on('wp_blocks')) {
+            $collectors[] = new WpBlocksCollector($this->container->make(BlockRecorder::class));
+        }
+
+        if ($on('wp_assets')) {
+            $collectors[] = new WpAssetsCollector($this->container);
+        }
+
+        if ($on('wp_languages')) {
+            $collectors[] = new WpLanguagesCollector($this->container->make(LanguageRecorder::class));
+        }
+
+        if ($on('doctor')) {
+            $collectors[] = new DoctorCollector('/'.trim((string) $config->get('debugbar.route_prefix', '_debugbar'), '/').'/pollora/doctor');
         }
 
         if ($on('wp_timeline') && $debugbar->hasCollector('time')) {

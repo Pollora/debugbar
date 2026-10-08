@@ -5,10 +5,21 @@ declare(strict_types=1);
 namespace Pollora\Debugbar;
 
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
+use Fruitcake\LaravelDebugbar\Middleware\DebugbarEnabled;
 use Illuminate\Support\ServiceProvider;
+use Pollora\BlockBinding\Domain\Events\BindingResolved;
 use Pollora\Debugbar\Bridges\MessageBridge;
+use Pollora\Debugbar\Http\DoctorController;
 use Pollora\Debugbar\Http\WordPressExitResponder;
+use Pollora\Debugbar\Recording\AsyncRecorder;
+use Pollora\Debugbar\Recording\BlockRecorder;
+use Pollora\Debugbar\Recording\CacheRecorder;
+use Pollora\Debugbar\Recording\CapabilityRecorder;
+use Pollora\Debugbar\Recording\HttpRecorder;
+use Pollora\Debugbar\Recording\LanguageRecorder;
+use Pollora\Debugbar\Recording\QueryTracer;
 use Pollora\Debugbar\Recording\RequestRecorder;
+use Pollora\Debugbar\Support\Components;
 use Pollora\WordPress\Events\WordPressBooting;
 
 /**
@@ -27,6 +38,17 @@ final class DebugbarServiceProvider extends ServiceProvider
 
         $this->app->singleton(RequestRecorder::class);
         $this->app->singleton(CollectorRegistrar::class);
+        $this->app->singleton(Components::class, fn (): Components => new Components);
+        $this->app->singleton(QueryTracer::class, fn ($app): QueryTracer => new QueryTracer(
+            (int) $app->make('config')->get('debugbar-pollora.options.wp_queries.soft_limit', 100),
+            $app->make(Components::class),
+        ));
+        $this->app->singleton(HttpRecorder::class);
+        $this->app->singleton(CacheRecorder::class);
+        $this->app->singleton(LanguageRecorder::class);
+        $this->app->singleton(CapabilityRecorder::class, fn ($app): CapabilityRecorder => new CapabilityRecorder((bool) $app->make('config')->get('debugbar-pollora.options.wp_capabilities.backtrace', false)));
+        $this->app->singleton(BlockRecorder::class);
+        $this->app->singleton(AsyncRecorder::class);
 
         if (! Activation::shouldRun($this->app)) {
             return;
@@ -38,10 +60,32 @@ final class DebugbarServiceProvider extends ServiceProvider
             define('SAVEQUERIES', true);
         }
 
-        $this->app->make('events')->listen(WordPressBooting::class, function () use ($config): void {
+        $on = static fn (string $collector): bool => (bool) $config->get("debugbar-pollora.collectors.{$collector}", true);
+
+        if ($on('wp_blocks') && class_exists(BindingResolved::class)) {
+            $this->app->make('events')->listen(BindingResolved::class, function (BindingResolved $binding): void {
+                $this->app->make(BlockRecorder::class)->recordBinding($binding);
+            });
+        }
+
+        $this->app->make('events')->listen(WordPressBooting::class, function () use ($config, $on): void {
             $this->app->make(RequestRecorder::class)->install(
                 countAllHooks: (bool) $config->get('debugbar-pollora.options.wp_hooks.count_filters', false),
             );
+
+            $recorders = [
+                QueryTracer::class => $on('wp_queries') && $config->get('debugbar-pollora.options.wp_queries.trace', true),
+                HttpRecorder::class => $on('wp_http'),
+                CacheRecorder::class => $on('wp_cache'),
+                LanguageRecorder::class => $on('wp_languages'),
+                CapabilityRecorder::class => $on('wp_capabilities'),
+                BlockRecorder::class => $on('wp_blocks'),
+                AsyncRecorder::class => $on('pollora'),
+            ];
+
+            foreach (array_keys(array_filter($recorders)) as $recorder) {
+                $this->app->make($recorder)->install();
+            }
 
             if ($config->get('debugbar-pollora.collectors.bridges', true)) {
                 (new MessageBridge($this->collectingDebugbar(...)))->install(
@@ -51,7 +95,13 @@ final class DebugbarServiceProvider extends ServiceProvider
 
             (new WordPressExitResponder(
                 $this->collectingDebugbar(...),
-                fn (LaravelDebugbar $debugbar) => $this->app->make(CollectorRegistrar::class)->register($debugbar),
+                function (LaravelDebugbar $debugbar): void {
+                    // WordPress can exit before the booted callbacks that index
+                    // route names have run, and Debugbar's collectors link to
+                    // its own named routes
+                    $this->app->make('router')->getRoutes()->refreshNameLookups();
+                    $this->app->make(CollectorRegistrar::class)->register($debugbar);
+                },
             ))->install();
         });
     }
@@ -64,6 +114,13 @@ final class DebugbarServiceProvider extends ServiceProvider
 
         if (! Activation::shouldRun($this->app)) {
             return;
+        }
+
+        if ($this->app->make('config')->get('debugbar-pollora.collectors.doctor', true)) {
+            $this->app->make('router')
+                ->get(trim((string) $this->app->make('config')->get('debugbar.route_prefix', '_debugbar'), '/').'/pollora/doctor', DoctorController::class)
+                ->middleware([...(array) $this->app->make('config')->get('debugbar.route_middleware', []), DebugbarEnabled::class])
+                ->name('debugbar.pollora.doctor');
         }
 
         $this->app->booted(function (): void {

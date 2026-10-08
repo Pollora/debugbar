@@ -134,7 +134,7 @@ abstract class Collector extends DataCollector implements AssetProvider, Rendera
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     public function getAssets(): array
     {
@@ -149,6 +149,21 @@ abstract class Collector extends DataCollector implements AssetProvider, Rendera
     }
 
     public function reset(): void {}
+
+    /**
+     * A path relative to the project, so the bar names a file someone can open.
+     */
+    protected function relativePath(string $path): string
+    {
+        try {
+            $base = function_exists('base_path') ? rtrim(base_path(), '/').'/' : '';
+        } catch (\Throwable) {
+            // No application to ask: show the path as it is
+            return $path;
+        }
+
+        return $base !== '' && str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+    }
 
     /**
      * What the tab shows, in the shape its widget takes.

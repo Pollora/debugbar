@@ -22,6 +22,18 @@ add_action('pollora/debugbar/register', function ($bar): void {
 add_action('init', function (): void {
     do_action('pollora/debugbar/message', 'Acme cart {id} rebuilt', 'info', ['id' => 'c-42']);
     do_action('qm/warning', 'Written for Query Monitor');
+
+    // An HTTP call answered in place, so the test needs no network
+    add_filter('pre_http_request', function ($pre, $args, $url) {
+        return str_starts_with($url, 'https://api.acme.test/')
+            ? ['headers' => [], 'body' => '{}', 'response' => ['code' => 200, 'message' => 'OK'], 'cookies' => [], 'filename' => null]
+            : $pre;
+    }, 10, 3);
+    wp_remote_get('https://api.acme.test/stock');
+
+    // WordPress only announces a transient whose value changed
+    set_transient('acme_rates', ['eur' => 1.0, 'at' => microtime(true)], HOUR_IN_SECONDS);
+    current_user_can('edit_posts');
 });
 
 if (class_exists(Collector::class)) {
