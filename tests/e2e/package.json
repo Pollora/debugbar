@@ -1,0 +1,16 @@
+{
+  "name": "pollora-debugbar-e2e",
+  "private": true,
+  "description": "Browser tests run against a real Pollora site with pollora/debugbar installed",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.4"
+  }
+}
