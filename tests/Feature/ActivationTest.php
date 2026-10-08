@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 use Pollora\Debugbar\Activation;
 
 /**
@@ -48,4 +49,13 @@ it("can be turned off while keeping Debugbar's other tabs", function (): void {
     config(['debugbar-pollora.enabled' => false]);
 
     expect(Activation::shouldRun($this->app))->toBeFalse();
+});
+
+it('tells a page loaded in an iframe from a page of its own', function (): void {
+    $framed = Request::create('/');
+    $framed->headers->set('Sec-Fetch-Dest', 'iframe');
+
+    expect(Activation::isFramed($framed))->toBeTrue()
+        ->and(Activation::isFramed(Request::create('/?wp_site_preview=1')))->toBeTrue()
+        ->and(Activation::isFramed(Request::create('/')))->toBeFalse();
 });

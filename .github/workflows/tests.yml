@@ -27,8 +27,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pdo_sqlite
           coverage: none
 
-      - name: Use the unreleased framework (until v13.35.3 is tagged; feature branch until framework#442 is merged)
-        run: composer require --no-update --no-interaction "pollora/framework:dev-feat/debugbar-extension-points as 13.35.3"
+      - name: Use the unreleased framework (release branch until v13.35.3 is tagged)
+        run: composer require --no-update --no-interaction "pollora/framework:dev-release/v13.35.3 as 13.35.3"
 
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction
@@ -50,8 +50,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip
           coverage: none
 
-      - name: Use the unreleased framework (until v13.35.3 is tagged; feature branch until framework#442 is merged)
-        run: composer require --no-update --no-interaction "pollora/framework:dev-feat/debugbar-extension-points as 13.35.3"
+      - name: Use the unreleased framework (release branch until v13.35.3 is tagged)
+        run: composer require --no-update --no-interaction "pollora/framework:dev-release/v13.35.3 as 13.35.3"
 
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction
@@ -113,11 +113,11 @@ jobs:
             -e 's/^# DB_PASSWORD=.*/DB_PASSWORD=db/' \
             .env
 
-      # Until v13.35.3 is tagged, the framework comes from framework#442's branch.
+      # Until v13.35.3 is tagged, the framework comes from its release branch.
       - name: Install the skeleton with this package checkout
         run: |
           ddev composer config repositories.debugbar '{"type": "path", "url": "packages/debugbar", "options": {"symlink": false, "versions": {"pollora/debugbar": "0.1.0"}}}'
-          ddev composer require "pollora/framework:dev-feat/debugbar-extension-points as 13.35.3" --with-all-dependencies --no-interaction --no-progress --no-scripts
+          ddev composer require "pollora/framework:dev-release/v13.35.3 as 13.35.3" --with-all-dependencies --no-interaction --no-progress --no-scripts
           ddev composer require --dev pollora/debugbar:0.1.0 --with-all-dependencies --no-interaction --no-progress
 
       - name: Generate application key

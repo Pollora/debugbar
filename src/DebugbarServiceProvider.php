@@ -9,16 +9,19 @@ use Fruitcake\LaravelDebugbar\Middleware\DebugbarEnabled;
 use Illuminate\Support\ServiceProvider;
 use Pollora\BlockBinding\Domain\Events\BindingResolved;
 use Pollora\Debugbar\Bridges\MessageBridge;
+use Pollora\Debugbar\Http\AdminBarRenderer;
 use Pollora\Debugbar\Http\DoctorController;
 use Pollora\Debugbar\Http\WordPressExitResponder;
 use Pollora\Debugbar\Recording\AsyncRecorder;
 use Pollora\Debugbar\Recording\BlockRecorder;
 use Pollora\Debugbar\Recording\CacheRecorder;
 use Pollora\Debugbar\Recording\CapabilityRecorder;
+use Pollora\Debugbar\Recording\HookTimer;
 use Pollora\Debugbar\Recording\HttpRecorder;
 use Pollora\Debugbar\Recording\LanguageRecorder;
 use Pollora\Debugbar\Recording\QueryTracer;
 use Pollora\Debugbar\Recording\RequestRecorder;
+use Pollora\Debugbar\Recording\SiteRecorder;
 use Pollora\Debugbar\Support\Components;
 use Pollora\WordPress\Events\WordPressBooting;
 
@@ -49,6 +52,8 @@ final class DebugbarServiceProvider extends ServiceProvider
         $this->app->singleton(CapabilityRecorder::class, fn ($app): CapabilityRecorder => new CapabilityRecorder((bool) $app->make('config')->get('debugbar-pollora.options.wp_capabilities.backtrace', false)));
         $this->app->singleton(BlockRecorder::class);
         $this->app->singleton(AsyncRecorder::class);
+        $this->app->singleton(HookTimer::class);
+        $this->app->singleton(SiteRecorder::class);
 
         if (! Activation::shouldRun($this->app)) {
             return;
@@ -62,13 +67,34 @@ final class DebugbarServiceProvider extends ServiceProvider
 
         $on = static fn (string $collector): bool => (bool) $config->get("debugbar-pollora.collectors.{$collector}", true);
 
+        $admin = $config->get('debugbar-pollora.admin.enabled', true) && AdminBarRenderer::isAdminPage();
+
+        $this->app->booting(function () use ($config): void {
+            // The Site Editor and the Customizer show the front end in an
+            // iframe: the request is still stored, but a second bar inside
+            // the canvas would cover the page being edited
+            if (! $config->get('debugbar-pollora.iframes', false) && $this->app->bound('request') && Activation::isFramed($this->app->make('request'))) {
+                $config->set('debugbar.inject', false);
+            }
+        });
+
+        if ($admin) {
+            // Debugbar adds its tabs while it boots; by then every provider has
+            // registered and its config is merged
+            $this->app->booting(function () use ($config): void {
+                foreach ((array) $config->get('debugbar-pollora.admin.hidden_collectors', AdminBarRenderer::LARAVEL_ONLY_COLLECTORS) as $collector) {
+                    $config->set("debugbar.collectors.{$collector}", false);
+                }
+            });
+        }
+
         if ($on('wp_blocks') && class_exists(BindingResolved::class)) {
             $this->app->make('events')->listen(BindingResolved::class, function (BindingResolved $binding): void {
                 $this->app->make(BlockRecorder::class)->recordBinding($binding);
             });
         }
 
-        $this->app->make('events')->listen(WordPressBooting::class, function () use ($config, $on): void {
+        $this->app->make('events')->listen(WordPressBooting::class, function () use ($config, $on, $admin): void {
             $this->app->make(RequestRecorder::class)->install(
                 countAllHooks: (bool) $config->get('debugbar-pollora.options.wp_hooks.count_filters', false),
             );
@@ -81,6 +107,8 @@ final class DebugbarServiceProvider extends ServiceProvider
                 CapabilityRecorder::class => $on('wp_capabilities'),
                 BlockRecorder::class => $on('wp_blocks'),
                 AsyncRecorder::class => $on('pollora'),
+                HookTimer::class => $on('wp_hooks') && $config->get('debugbar-pollora.options.wp_hooks.timings', false),
+                SiteRecorder::class => $on('wp_request'),
             ];
 
             foreach (array_keys(array_filter($recorders)) as $recorder) {
@@ -93,16 +121,19 @@ final class DebugbarServiceProvider extends ServiceProvider
                 );
             }
 
-            (new WordPressExitResponder(
-                $this->collectingDebugbar(...),
-                function (LaravelDebugbar $debugbar): void {
-                    // WordPress can exit before the booted callbacks that index
-                    // route names have run, and Debugbar's collectors link to
-                    // its own named routes
-                    $this->app->make('router')->getRoutes()->refreshNameLookups();
-                    $this->app->make(CollectorRegistrar::class)->register($debugbar);
-                },
-            ))->install();
+            $prepare = function (LaravelDebugbar $debugbar): void {
+                // WordPress can exit before the booted callbacks that index
+                // route names have run, and Debugbar's collectors link to
+                // its own named routes
+                $this->app->make('router')->getRoutes()->refreshNameLookups();
+                $this->app->make(CollectorRegistrar::class)->register($debugbar);
+            };
+
+            (new WordPressExitResponder($this->collectingDebugbar(...), $prepare))->install();
+
+            if ($admin) {
+                (new AdminBarRenderer($this->collectingDebugbar(...), $prepare))->install();
+            }
         });
     }
 

@@ -6,6 +6,7 @@ namespace Pollora\Debugbar;
 
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
 
 /**
  * Whether Pollora's tabs run for this request.
@@ -41,5 +42,18 @@ final class Activation
             : env('DEBUGBAR_ENABLED');
 
         return (bool) ($enabled ?? $config->get('app.debug'));
+    }
+
+    /**
+     * Whether the page is loaded inside an iframe: the Site Editor canvas,
+     * the Customizer preview, an embed.
+     *
+     * Browsers say so with `Sec-Fetch-Dest`; `wp_site_preview` covers the
+     * Site Editor in a browser that does not send it.
+     */
+    public static function isFramed(Request $request): bool
+    {
+        return $request->headers->get('Sec-Fetch-Dest') === 'iframe'
+            || $request->query->has('wp_site_preview');
     }
 }
