@@ -1,0 +1,12 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - src
+    ignoreErrors:
+        # Pollora's services are read defensively, so that a tab survives an
+        # older framework: method_exists() guards PHPStan cannot narrow on.
+        - '#Call to function method_exists\(\) with .* will always evaluate to true#'
+    reportUnmatchedIgnoredErrors: false
