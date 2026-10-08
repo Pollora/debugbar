@@ -34,9 +34,9 @@ final class Registry
      *
      * @param  \Closure(): array<string, mixed>  $values
      */
-    public function variables(string $name, string $title, \Closure $values, string $origin): static
+    public function variables(string $name, string $title, \Closure $values, string $origin, string $icon = 'box'): static
     {
-        $this->collectors[] = new CallbackCollector($this->checked($name), $title, $origin, $values);
+        $this->collectors[] = new CallbackCollector($this->checked($name), $title, $origin, $values, icon: $icon);
 
         return $this;
     }
@@ -47,9 +47,9 @@ final class Registry
      * @param  \Closure(): array<array-key, array<string, mixed>>  $rows  Row key => [column => value]
      * @param  array<string, string>  $columns  Column key => label; empty to show every field
      */
-    public function table(string $name, string $title, \Closure $rows, string $origin, array $columns = []): static
+    public function table(string $name, string $title, \Closure $rows, string $origin, array $columns = [], string $icon = 'table'): static
     {
-        $this->collectors[] = new CallbackCollector($this->checked($name), $title, $origin, $rows, Widget::Table, $columns);
+        $this->collectors[] = new CallbackCollector($this->checked($name), $title, $origin, $rows, Widget::Table, $columns, $icon);
 
         return $this;
     }

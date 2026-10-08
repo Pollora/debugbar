@@ -48,7 +48,7 @@ final class PolloraCollector extends Collector
 
     public function icon(): string
     {
-        return 'hexagon';
+        return 'leaf';
     }
 
     /**

@@ -46,11 +46,13 @@ abstract class Collector extends DataCollector implements AssetProvider, Rendera
     }
 
     /**
-     * A tabler icon name, as php-debugbar 3 uses.
+     * The tab's icon: one of the icons php-debugbar ships (`box`, `database`,
+     * `link`, `leaf`, `search`, `table`, `tags`, `clock`, `bolt`, `flag`…;
+     * see its resources/icons.css). Any other name shows an empty square.
      */
     public function icon(): string
     {
-        return 'puzzle';
+        return 'box';
     }
 
     /**

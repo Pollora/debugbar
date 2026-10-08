@@ -42,5 +42,6 @@ it('names the callbacks Pollora registered, with their priority', function (): v
 it('describes callbacks the way a reader recognises them', function (): void {
     expect(WpHooksCollector::describe('wp_head'))->toBe('wp_head')
         ->and(WpHooksCollector::describe(['Acme\\Cart', 'boot']))->toBe('Acme\\Cart::boot')
-        ->and(WpHooksCollector::describe(fn (): null => null))->toBe('Closure');
+        ->and(WpHooksCollector::describe(fn (): null => null))->toMatch('/^closure in P\\\\Tests\\\\Unit\\\\Collectors\\\\WpHooksCollectorTest\\S* \\(WpHooksCollectorTest\\.php:\\d+\\)$/')
+        ->and(WpHooksCollector::describe((new ArrayObject)->count(...)))->toBe('ArrayObject::count');
 });

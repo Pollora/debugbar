@@ -70,14 +70,15 @@ final class WpHooksCollector extends Collector
     }
 
     /**
-     * A callback as a reader recognises it: `Class::method`, a function name or `Closure`.
+     * A callback as a reader recognises it: `Class::method`, a function name,
+     * or where a closure was written.
      */
     public static function describe(mixed $callback): string
     {
         return match (true) {
             is_string($callback) => $callback,
             is_array($callback) && isset($callback[0], $callback[1]) => (is_object($callback[0]) ? $callback[0]::class : (string) $callback[0]).'::'.(string) $callback[1],
-            $callback instanceof \Closure => 'Closure',
+            $callback instanceof \Closure => self::describeClosure($callback),
             is_object($callback) => $callback::class,
             default => 'unknown',
         };
@@ -115,6 +116,34 @@ final class WpHooksCollector extends Collector
     }
 
     /**
+     * `$this->boot(...)` reads as `Class::boot`; a real closure as the class
+     * it was written in and its file and line, since "Closure" alone says
+     * nothing when most of Pollora's callbacks are closures.
+     */
+    private static function describeClosure(\Closure $closure): string
+    {
+        $reflection = new \ReflectionFunction($closure);
+        $scope = $reflection->getClosureScopeClass()?->getName();
+
+        if (! str_contains($reflection->getName(), '{closure')) {
+            return $scope !== null ? "{$scope}::{$reflection->getName()}" : $reflection->getName();
+        }
+
+        $where = basename((string) $reflection->getFileName()).':'.$reflection->getStartLine();
+
+        return $scope !== null ? "closure in {$scope} ({$where})" : "closure ({$where})";
+    }
+
+    private static function priority(int $priority): string
+    {
+        return match ($priority) {
+            PHP_INT_MAX => 'last',
+            PHP_INT_MIN => 'first',
+            default => (string) $priority,
+        };
+    }
+
+    /**
      * Pollora's registrations by hook, as `Class::method` names.
      *
      * Read from the hook services' own records: `$wp_filter` holds the same
@@ -134,7 +163,7 @@ final class WpHooksCollector extends Collector
             foreach ((array) $service->all() as $hook => $registrations) {
                 foreach ((array) $registrations as $registration) {
                     $callback = $registration['handler'] ?? $registration['callback'] ?? null;
-                    $byHook[(string) $hook][] = sprintf('%s @%d', self::describe($callback), (int) ($registration['priority'] ?? 10));
+                    $byHook[(string) $hook][] = sprintf('%s @%s', self::describe($callback), self::priority((int) ($registration['priority'] ?? 10)));
                 }
             }
         }

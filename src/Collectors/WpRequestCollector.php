@@ -49,7 +49,7 @@ final class WpRequestCollector extends Collector
 
     public function icon(): string
     {
-        return 'brand-wordpress';
+        return 'search';
     }
 
     public function position(): int

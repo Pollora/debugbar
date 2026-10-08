@@ -24,7 +24,7 @@ final class CallbackCollector extends Collector
         private readonly \Closure $data,
         private readonly Widget $widget = Widget::Variables,
         private readonly array $columns = [],
-        private readonly string $icon = 'puzzle',
+        private readonly string $icon = 'box',
     ) {}
 
     public function getName(): string
