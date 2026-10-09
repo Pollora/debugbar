@@ -1,0 +1,175 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [8.3, 8.4]
+
+    name: PHP ${{ matrix.php }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pdo_sqlite
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Execute tests
+        run: vendor/bin/pest
+
+  static-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Run PHPStan
+        run: composer phpstan:ci
+
+      - name: Check coding standards with Pint
+        run: composer lint:check
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - name: Checkout skeleton
+        uses: actions/checkout@v4
+        with:
+          repository: Pollora/pollora
+
+      - name: Checkout this package
+        uses: actions/checkout@v4
+        with:
+          path: packages/debugbar
+
+      - name: Setup DDEV
+        uses: ddev/github-action-setup-ddev@v1
+        with:
+          autostart: false
+
+      - name: Configure DDEV
+        run: |
+          ddev config \
+            --project-name=pollora-debugbar \
+            --project-type=wordpress \
+            --docroot=public \
+            --php-version=8.4 \
+            --webserver-type=apache-fpm \
+            --database=mariadb:10.11 \
+            --nodejs-version=22 \
+            --disable-settings-management
+
+      - name: Start DDEV
+        run: ddev start
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          sed -i \
+            -e 's#^APP_URL=.*#APP_URL=https://pollora-debugbar.ddev.site#' \
+            -e 's#^APP_ENV=.*#APP_ENV=local#' \
+            -e 's#^APP_DEBUG=.*#APP_DEBUG=true#' \
+            -e 's#^DB_CONNECTION=.*#DB_CONNECTION=mysql#' \
+            -e 's/^# DB_HOST=.*/DB_HOST=db/' \
+            -e 's/^# DB_PORT=.*/DB_PORT=3306/' \
+            -e 's/^# DB_DATABASE=.*/DB_DATABASE=db/' \
+            -e 's/^# DB_USERNAME=.*/DB_USERNAME=db/' \
+            -e 's/^# DB_PASSWORD=.*/DB_PASSWORD=db/' \
+            .env
+
+      - name: Install the skeleton with this package checkout
+        run: |
+          ddev composer config repositories.debugbar '{"type": "path", "url": "packages/debugbar", "options": {"symlink": false, "versions": {"pollora/debugbar": "1.0.0"}}}'
+          ddev composer require --dev pollora/debugbar:1.0.0 --with-all-dependencies --no-interaction --no-progress
+
+      - name: Generate application key
+        run: ddev exec php artisan key:generate --no-interaction
+
+      - name: Install WordPress
+        run: |
+          ddev exec php artisan pollora:install --install \
+            --title="Pollora" \
+            --description="Pollora Debugbar CI" \
+            --admin-user=admin \
+            --admin-email=admin@example.com \
+            --admin-password=pollora-ci-password \
+            --locale=en_US \
+            --public=false \
+            --no-interaction
+
+      - name: Add the plugin and package fixtures
+        run: |
+          mkdir -p public/content/mu-plugins
+          cp packages/debugbar/tests/e2e/fixtures/acme-debugbar.php public/content/mu-plugins/
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: packages/debugbar/tests/e2e/package-lock.json
+
+      - name: Install the browser tests
+        working-directory: packages/debugbar/tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Trust the site's certificate
+        run: |
+          if command -v mkcert >/dev/null && [ -f "$(mkcert -CAROOT)/rootCA.pem" ]; then
+            echo "NODE_EXTRA_CA_CERTS=$(mkcert -CAROOT)/rootCA.pem" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No mkcert authority on the runner; certificate checks are off for this disposable site"
+            echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> "$GITHUB_ENV"
+          fi
+
+      - name: Browser tests
+        working-directory: packages/debugbar/tests/e2e
+        env:
+          E2E_HOME_URL: https://pollora-debugbar.ddev.site
+        run: npx playwright test
+
+      - name: Upload the browser test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            packages/debugbar/tests/e2e/playwright-report
+            packages/debugbar/tests/e2e/test-results
+          retention-days: 14
+
+      - name: Laravel log
+        if: failure()
+        run: tail -n 200 storage/logs/laravel.log || true

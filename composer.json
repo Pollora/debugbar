@@ -1,0 +1,82 @@
+{
+    "name": "pollora/debugbar",
+    "description": "Laravel Debugbar for Pollora: WordPress queries, hooks, the template hierarchy and Pollora's internals in the debug bar",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "wordpress",
+        "laravel",
+        "debugbar",
+        "pollora",
+        "query-monitor"
+    ],
+    "authors": [
+        {
+            "name": "Amphibee",
+            "email": "contact@amphibee.fr"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "fruitcake/laravel-debugbar": "^4.4",
+        "pollora/framework": "^13.35.3"
+    },
+    "require-dev": {
+        "brain/monkey": "^2.7",
+        "laravel/pint": "^1.22",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^11.1",
+        "pestphp/pest": "^3.8",
+        "php-stubs/wordpress-stubs": "^7.1",
+        "phpstan/phpstan": "^2.1",
+        "szepeviktor/phpstan-wordpress": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Pollora\\Debugbar\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Pollora\\Debugbar\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Pollora\\Debugbar\\DebugbarServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "cweagans/composer-patches": true,
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true,
+            "pollora/helper-overrider": true,
+            "wikimedia/composer-merge-plugin": true
+        }
+    },
+    "scripts": {
+        "test": [
+            "@test:unit",
+            "@phpstan",
+            "@lint:check"
+        ],
+        "test:unit": "pest",
+        "phpstan": "phpstan analyse --memory-limit=1G",
+        "phpstan:ci": "phpstan analyse --memory-limit=1G --no-progress",
+        "lint": "pint",
+        "lint:check": "pint --test"
+    },
+    "scripts-descriptions": {
+        "test": "Run the whole quality gate as CI does",
+        "test:unit": "Run the Pest test suite",
+        "phpstan": "Run PHPStan static analysis",
+        "lint": "Apply Laravel Pint code style fixes",
+        "lint:check": "Verify code style without writing"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
