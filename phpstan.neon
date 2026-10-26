@@ -1,5 +1,6 @@
 includes:
-    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+    - vendor/pollora/harness/presets/phpstan/base.neon
+    # Larastan is not included yet: it boots a Laravel application and this package's test stubs cannot be loaded with it
 
 parameters:
     level: 6
