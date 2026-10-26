@@ -19,9 +19,10 @@
     "require": {
         "php": "^8.3",
         "fruitcake/laravel-debugbar": "^4.4",
-        "pollora/framework": "^13.35.3"
+        "pollora/framework": "^13.36.0"
     },
     "require-dev": {
+        "antecedent/patchwork": "^2.2",
         "brain/monkey": "^2.7",
         "laravel/pint": "^1.22",
         "mockery/mockery": "^1.6",
