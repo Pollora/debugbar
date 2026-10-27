@@ -79,7 +79,7 @@ final class WpHooksCollector extends Collector
         return match (true) {
             $callback instanceof TimedCallback => self::describe($callback->callback),
             is_string($callback) => $callback,
-            is_array($callback) && isset($callback[0], $callback[1]) => (is_object($callback[0]) ? $callback[0]::class : (string) $callback[0]).'::'.(string) $callback[1],
+            is_array($callback) && isset($callback[0], $callback[1]) => (is_object($callback[0]) ? $callback[0]::class : (string) $callback[0]).'::'.$callback[1],
             $callback instanceof \Closure => self::describeClosure($callback),
             is_object($callback) => $callback::class,
             default => 'unknown',

@@ -4,8 +4,5 @@
     "ratchet": {
         "phpstan_level": 6,
         "phpstan_baseline": 0
-    },
-    "observed": [
-        "Rector"
-    ]
+    }
 }

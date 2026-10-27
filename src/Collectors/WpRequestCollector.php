@@ -83,7 +83,7 @@ final class WpRequestCollector extends Collector
         if (is_object($wp_the_query) && isset($wp_the_query->query_vars)) {
             $data['Main query'] = array_filter(
                 (array) $wp_the_query->query_vars,
-                static fn (mixed $value): bool => $value !== '' && $value !== [] && $value !== null && $value !== false && $value !== 0,
+                static fn (mixed $value): bool => ! in_array($value, ['', [], null, false, 0], true),
             );
             $data['Main query results'] = sprintf(
                 '%d of %d found, %d page(s)',
