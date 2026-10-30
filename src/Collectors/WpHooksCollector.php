@@ -130,7 +130,7 @@ final class WpHooksCollector extends Collector
         // A file included from a method (a mu-plugin WordPress loads from
         // Pollora's Bootstrap) gives its closures that class's scope: name
         // the class only when the closure is written in it
-        $scope = $scopeClass !== null && $scopeClass->getFileName() === $reflection->getFileName() ? $scopeClass->getName() : null;
+        $scope = $scopeClass instanceof \ReflectionClass && $scopeClass->getFileName() === $reflection->getFileName() ? $scopeClass->getName() : null;
 
         if (! str_contains($reflection->getName(), '{closure')) {
             return $scope !== null ? "{$scope}::{$reflection->getName()}" : $reflection->getName();
