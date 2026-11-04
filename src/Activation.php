@@ -7,6 +7,7 @@ namespace Pollora\Debugbar;
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Request;
+use Illuminate\Support\Env;
 
 /**
  * Whether Pollora's tabs run for this request.
@@ -39,7 +40,7 @@ final class Activation
         // there yet.
         $enabled = $config->has('debugbar.enabled')
             ? value($config->get('debugbar.enabled'))
-            : env('DEBUGBAR_ENABLED');
+            : Env::get('DEBUGBAR_ENABLED');
 
         return (bool) ($enabled ?? $config->get('app.debug'));
     }
