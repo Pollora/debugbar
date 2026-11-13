@@ -59,3 +59,15 @@ it('tells a page loaded in an iframe from a page of its own', function (): void 
         ->and(Activation::isFramed(Request::create('/?wp_site_preview=1')))->toBeTrue()
         ->and(Activation::isFramed(Request::create('/')))->toBeFalse();
 });
+
+it("reads Debugbar's environment switch when its config is not merged yet", function (): void {
+    servingTheWeb($this->app);
+    config(['debugbar' => array_diff_key(config('debugbar'), ['enabled' => true])]);
+
+    config(['app.debug' => false]);
+    $off = Activation::shouldRun($this->app);
+    config(['app.debug' => true]);
+
+    expect($off)->toBeFalse()
+        ->and(Activation::shouldRun($this->app))->toBeTrue();
+});

@@ -65,3 +65,8 @@ it('does not name the class a closure was merely included from', function (): vo
 
     expect(WpHooksCollector::describe($loader->load()))->toMatch('/^closure \\(included-closure\\.php:\\d+\\)$/');
 });
+
+it('describes an invokable object by its class', function (): void {
+    expect(WpHooksCollector::describe(new ArrayObject))->toBe('ArrayObject')
+        ->and(WpHooksCollector::describe(42))->toBe('unknown');
+});

@@ -54,3 +54,12 @@ it('listens to every Query Monitor level', function (): void {
         expect(has_action($action))->toBeTrue();
     }
 });
+
+it('shows the message of a WP_Error as WordPress would print it', function (): void {
+    require_once __DIR__.'/../Fixtures/wordpress.php';
+    $debugbar = $this->collectingDebugbar();
+
+    (new MessageBridge(fn () => $debugbar))->message(new WP_Error('rest_forbidden', 'Sorry, you cannot do that.'), 'error');
+
+    expect(messagesOf($debugbar))->toContain('WP_Error: Sorry, you cannot do that.');
+});
