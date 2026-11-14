@@ -61,3 +61,24 @@ it('keeps looking for directories until WordPress has defined where plugins live
     expect($components->of('/anywhere/plugins/acme/acme.php'))->toBe('unknown')
         ->and((new ReflectionProperty(Components::class, 'directories'))->getValue($components))->toBeNull();
 });
+
+it('says "unknown" for a file with no name, and answers the same file the same way twice', function (): void {
+    expect(components()->of(''))->toBe('unknown');
+
+    $components = components();
+
+    expect($components->of('/site/themes/default/functions.php'))->toBe('theme: default')
+        ->and($components->of('/site/themes/default/functions.php'))->toBe('theme: default');
+});
+
+it('skips frames without a file or from the debug bar itself when it names the owner of a backtrace', function (): void {
+    $owner = components()->ofTrace([
+        ['file' => ''],
+        [],
+        ['file' => '/site/vendor/pollora/debugbar/src/Recording/QueryTracer.php'],
+        ['file' => '/site/themes/default/functions.php'],
+    ]);
+
+    expect($owner)->toBe('theme: default')
+        ->and(components()->ofTrace([]))->toBe('unknown');
+});

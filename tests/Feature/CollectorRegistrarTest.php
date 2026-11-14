@@ -6,6 +6,7 @@ use Brain\Monkey\Functions;
 use DebugBar\DataCollector\MessagesCollector;
 use Pollora\Debugbar\CollectorRegistrar;
 use Pollora\Debugbar\Contracts\SectionProvider;
+use Pollora\Hook\Domain\Contract\Action;
 
 function registrar(): CollectorRegistrar
 {
@@ -104,4 +105,36 @@ it('registers once, however often it is asked', function (): void {
     registrar()->register($debugbar);
 
     expect(registrar()->isRegistered())->toBeTrue();
+});
+
+it('adds the hook timings tab when the config turns the timings on', function (): void {
+    config(['debugbar-pollora.options.wp_hooks.timings' => true, 'debugbar-pollora.options.wp_hooks.timings_limit' => 5]);
+    $debugbar = $this->collectingDebugbar();
+
+    registrar()->register($debugbar);
+
+    expect($debugbar->hasCollector('wp_hook_timings'))->toBeTrue();
+});
+
+it('leaves the hook timings tab out by default', function (): void {
+    $debugbar = $this->collectingDebugbar();
+
+    registrar()->register($debugbar);
+
+    expect($debugbar->hasCollector('wp_hook_timings'))->toBeFalse();
+});
+
+it("passes Pollora's hook services to the hooks tab, and skips one that cannot list its callbacks", function (): void {
+    Functions\when('get_queried_object')->justReturn(null);
+    $GLOBALS['wp_actions'] = ['init' => 1];
+    $GLOBALS['wp_filter'] = [];
+    $this->app->instance(Action::class, Mockery::mock(Action::class));
+    $debugbar = $this->collectingDebugbar();
+
+    registrar()->register($debugbar);
+    $rows = $debugbar->getCollector('wp_hooks')->collect()['data']['data'];
+    unset($GLOBALS['wp_actions'], $GLOBALS['wp_filter']);
+
+    expect($rows)->toHaveKey('init')
+        ->and($rows['init']['pollora'])->toBe('');
 });

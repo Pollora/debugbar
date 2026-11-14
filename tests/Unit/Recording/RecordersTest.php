@@ -185,3 +185,18 @@ describe('transients, languages and async actions', function (): void {
         expect($recorder->dispatched())->toBe([['hook' => 'save_post', 'handler' => 'App\\Sync@handle', 'driver' => 'queue', 'delay' => 30]]);
     });
 });
+
+describe('capability checks by several users', function (): void {
+    it('lists the same capability once per user and result', function (): void {
+        $recorder = new CapabilityRecorder;
+        $record = new ReflectionMethod($recorder, 'record');
+        $record->invoke($recorder, ['read' => true], ['read'], ['read', 1]);
+        $record->invoke($recorder, [], ['read'], ['read', 0]);
+
+        $rows = (new WpCapabilitiesCollector($recorder, noComponents()))->collect()['data']['data'];
+
+        expect(array_keys($rows))->toBe(['read', 'read '])
+            ->and(array_column($rows, 'user'))->toBe(['#1', 'visitor'])
+            ->and(array_column($rows, 'result'))->toBe(['granted', 'refused']);
+    });
+});
