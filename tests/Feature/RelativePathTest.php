@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use Brain\Monkey\Filters;
+use Brain\Monkey\Functions;
 use DebugBar\DataFormatter\DataFormatter;
 use Pollora\Debugbar\Collectors\WpRequestCollector;
 use Pollora\Debugbar\Recording\RequestRecorder;
 
 function templateShownFor(string $template): mixed
 {
+    Functions\when('get_queried_object')->justReturn(null);
     $callback = null;
     Filters\expectAdded('template_include')->once()->whenHappen(function (callable $added) use (&$callback): void {
         $callback = $added;
