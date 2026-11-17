@@ -125,3 +125,23 @@ if (! class_exists('WP_Block_Type_Registry')) {
         }
     }
 }
+
+if (! class_exists('WP_Screen')) {
+    class WP_Screen
+    {
+        public string $id = 'edit-post';
+
+        public string $base = 'edit';
+
+        public string $post_type = 'post';
+
+        public string $taxonomy = '';
+
+        public bool $blockEditor = false;
+
+        public function is_block_editor(): bool
+        {
+            return $this->blockEditor;
+        }
+    }
+}

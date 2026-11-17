@@ -226,3 +226,53 @@ describe('a timed callback', function (): void {
             ->and($timer->timings()[0]['calls'])->toBe(1);
     });
 });
+
+it('keeps, per timed callback, the hook, priority, callback, file, calls and the longest single run', function (): void {
+    $timer = new HookTimer;
+    $callback = static function (int $microseconds): void {
+        usleep($microseconds);
+    };
+    $GLOBALS['wp_filter']['slowly'] = (object) ['callbacks' => [7 => ['cb' => ['function' => $callback, 'accepted_args' => 1]]]];
+
+    $timer->wrap('slowly');
+    $timed = $GLOBALS['wp_filter']['slowly']->callbacks[7]['cb']['function'];
+    $timed(4000);
+    $timed(0);
+    $timed(1000);
+
+    $timing = $timer->timings()[0];
+
+    expect($timer->timings())->toHaveCount(1)
+        ->and($timing['hook'])->toBe('slowly')
+        ->and($timing['priority'])->toBe(7)
+        ->and($timing['callback'])->toBe($callback)
+        ->and($timing['file'])->toBe(__FILE__)
+        ->and($timing['calls'])->toBe(3)
+        ->and($timing['max'])->toBeGreaterThanOrEqual(4_000_000)
+        ->and($timing['max'])->toBeLessThanOrEqual($timing['total'])
+        ->and($timing['total'])->toBeGreaterThan($timing['max'])
+        ->and($timing['self'])->toBe($timing['total']);
+});
+
+it('lists only the callbacks that actually ran, as a list', function (): void {
+    $timer = new HookTimer;
+    edgeHook('init', ['ran' => 'strtoupper', 'idle' => 'strtolower', 'also' => 'strrev']);
+    $timer->wrap('init');
+    edgeCallback('init', 'also')('x');
+
+    expect(array_keys($timer->timings()))->toBe([0])
+        ->and($timer->timings()[0]['calls'])->toBe(1);
+});
+
+it('does not time a callback with a by-reference parameter, nor leaves the hook half wrapped', function (): void {
+    $timer = new HookTimer;
+    $byReference = static function (array &$items): void {
+        $items[] = 1;
+    };
+    edgeHook('mixed', ['ref' => $byReference, 'plain' => 'strtoupper']);
+
+    $timer->wrap('mixed');
+
+    expect(edgeCallback('mixed', 'ref'))->toBe($byReference)
+        ->and(edgeCallback('mixed', 'plain'))->toBeInstanceOf(TimedCallback::class);
+});

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Container\Container;
 use Pollora\Debugbar\Collector;
 use Pollora\Debugbar\Collectors\CallbackCollector;
+use Pollora\Debugbar\Collectors\DoctorCollector;
 use Pollora\Debugbar\Collectors\PolloraCollector;
 use Pollora\Debugbar\Collectors\WpAssetsCollector;
 use Pollora\Debugbar\Collectors\WpBlocksCollector;
@@ -106,4 +107,49 @@ it('takes the widget, icon and columns a third party gave its callback tab', fun
         ->and($collector->icon())->toBe('tags')
         ->and($collector->columns())->toBe(['qty' => 'Quantity'])
         ->and($collector->collect()['data']['data'])->toBe(['row' => ['qty' => 2]]);
+});
+
+it('gives each shipped tab exactly its title, icon, position and columns', function (): void {
+    $expected = [
+        'pollora' => ['Pollora', 'leaf', 0, []],
+        'wp_request' => ['WP Request', 'search', 10, []],
+        'wp_queries' => ['WP Queries', 'database', 20, []],
+        'wp_hooks' => ['WP Hooks', 'link', 30, ['calls' => 'Ran', 'callbacks' => 'Callbacks', 'pollora' => 'Registered by Pollora']],
+        'wp_hook_timings' => ['WP Hook timings', 'clock', 35, ['self' => 'Own time', 'total' => 'Total', 'calls' => 'Calls', 'hook' => 'Hook', 'component' => 'From']],
+        'wp_http' => ['WP HTTP', 'external-link', 40, ['result' => 'Result', 'time' => 'Time', 'transport' => 'Transport', 'component' => 'From']],
+        'wp_cache' => ['WP Cache', 'bolt', 50, []],
+        'wp_capabilities' => ['WP Capabilities', 'circle-check', 60, ['result' => 'Result', 'user' => 'User', 'count' => 'Checks', 'component' => 'From']],
+        'wp_blocks' => ['WP Blocks', 'box', 70, ['count' => 'Count', 'time' => 'Time', 'kind' => 'Kind', 'detail' => 'Detail']],
+        'wp_assets' => ['WP Assets', 'file-code', 80, ['printed' => 'Printed', 'source' => 'Source', 'dependencies' => 'Dependencies', 'note' => 'Note']],
+        'wp_languages' => ['WP Languages', 'flag', 90, ['file' => 'File', 'found' => 'Found', 'kind' => 'Kind']],
+    ];
+
+    foreach (shippedCollectors() as $name => $collector) {
+        expect([$collector->title(), $collector->icon(), $collector->position(), $collector->columns()])->toBe($expected[$name], $name);
+    }
+});
+
+it('gives each shipped tab the widget and origin it belongs to', function (): void {
+    $tables = ['wp_hooks', 'wp_hook_timings', 'wp_http', 'wp_capabilities', 'wp_blocks', 'wp_assets', 'wp_languages'];
+
+    foreach (shippedCollectors() as $name => $collector) {
+        $widget = match (true) {
+            $name === 'wp_queries' => Widget::Queries,
+            in_array($name, $tables, true) => Widget::Table,
+            default => Widget::Variables,
+        };
+
+        expect($collector->widget())->toBe($widget, $name)
+            ->and($collector->origin())->toBe($name === 'pollora' ? Origin::POLLORA : Origin::WORDPRESS, $name);
+    }
+});
+
+it('knows the doctor tab by name, title, icon, position and origin', function (): void {
+    $doctor = new DoctorCollector('/doctor');
+
+    expect($doctor->getName())->toBe('pollora_doctor')
+        ->and($doctor->title())->toBe('Doctor')
+        ->and($doctor->icon())->toBe('bug')
+        ->and($doctor->position())->toBe(1)
+        ->and($doctor->origin())->toBe(Origin::POLLORA);
 });
