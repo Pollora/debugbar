@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use Brain\Monkey\Actions;
 use Brain\Monkey\Filters;
+use Pollora\Debugbar\Recording\AsyncRecorder;
 use Pollora\Debugbar\Recording\BlockRecorder;
 use Pollora\Debugbar\Recording\CacheRecorder;
 use Pollora\Debugbar\Recording\HttpRecorder;
+use Pollora\Debugbar\Recording\LanguageRecorder;
 use Pollora\Debugbar\Recording\SiteRecorder;
 
 require_once __DIR__.'/../../Fixtures/wordpress.php';
@@ -254,5 +256,46 @@ describe('block recorder details', function (): void {
 
         expect($recorder->blocks()['core/group']['maxDepth'])->toBe(2)
             ->and($recorder->blocks()['core/group']['count'])->toBe(4);
+    });
+});
+
+describe('async and language recorder details', function (): void {
+    it('records each dispatch with its hook, handler, driver and delay, from whatever types they come in', function (): void {
+        $hooks = listenersOf(['pollora/async/dispatched']);
+        $recorder = new AsyncRecorder;
+        $recorder->install();
+
+        $hooks['pollora/async/dispatched']((object) ['hook' => 'init', 'handler' => 'App\\Job::run', 'driver' => 'sync'], '30');
+        $hooks['pollora/async/dispatched']((object) ['handler' => new stdClass, 'hook' => 5, 'driver' => 7]);
+        $hooks['pollora/async/dispatched']((object) [], 2);
+        $hooks['pollora/async/dispatched']('not an object', 2);
+
+        expect($recorder->dispatched())->toBe([
+            ['hook' => 'init', 'handler' => 'App\\Job::run', 'driver' => 'sync', 'delay' => 30],
+            ['hook' => '5', 'handler' => 'stdClass', 'driver' => '7', 'delay' => 0],
+            ['hook' => '', 'handler' => 'null', 'driver' => '', 'delay' => 2],
+        ]);
+    });
+
+    it('records each translation file with its domain, whether it can be read, and how it was asked for', function (): void {
+        $hooks = listenersOf(['load_translation_file', 'load_script_translation_file']);
+        $recorder = new LanguageRecorder;
+        $recorder->install();
+
+        $returned = $hooks['load_translation_file'](__FILE__, 'acme');
+        $hooks['load_translation_file'](12, 5);
+        $hooks['load_translation_file']('', 'empty');
+        $hooks['load_script_translation_file'](__FILE__, 'app', 'acme');
+        $hooks['load_script_translation_file']('/nope/fr.json', 7, 6);
+        $hooks['load_script_translation_file'](false, 'skipped', 'acme');
+
+        expect($returned)->toBe(__FILE__)
+            ->and($recorder->files())->toBe([
+                ['domain' => 'acme', 'file' => __FILE__, 'found' => true, 'kind' => 'php / mo'],
+                ['domain' => '5', 'file' => '12', 'found' => false, 'kind' => 'php / mo'],
+                ['domain' => 'empty', 'file' => '', 'found' => false, 'kind' => 'php / mo'],
+                ['domain' => 'acme', 'file' => __FILE__, 'found' => true, 'kind' => 'script (app)'],
+                ['domain' => '6', 'file' => '/nope/fr.json', 'found' => false, 'kind' => 'script (7)'],
+            ]);
     });
 });
