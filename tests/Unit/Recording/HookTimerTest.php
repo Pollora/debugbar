@@ -90,7 +90,9 @@ it('counts the time spent in nested hooks in the total, not in the own time', fu
     $byHook = array_column($timer->timings(), null, 'hook');
 
     expect($byHook['outer']['total'])->toBeGreaterThan(6_000_000)
-        ->and($byHook['outer']['self'])->toBeLessThan(6_000_000)
+        ->and($byHook['outer']['self'] + $byHook['inner']['total'])->toBe($byHook['outer']['total'])
+        ->and($byHook['outer']['self'])->toBeLessThan($byHook['outer']['total'])
+        ->and($byHook['inner']['self'])->toBe($byHook['inner']['total'])
         ->and($byHook['inner']['self'])->toBeGreaterThan(6_000_000);
 });
 
