@@ -321,3 +321,21 @@ it('shows each switch with the component that made it', function (): void {
         ->and($withComponents['Site switches'][1])->toMatch('/^restore #2 → #1 \(plugin: acme\)$/')
         ->and($without['Site switches'])->toBe(['switch #1 → #2', 'restore #2 → #1']);
 });
+
+it('shows the request, query variables and main query of an object WordPress filled with other types', function (): void {
+    $GLOBALS['wp'] = (object) ['request' => 5, 'query_vars' => (object) ['a' => 1]];
+    $GLOBALS['wp_the_query'] = (object) ['query_vars' => (object) ['p' => 4, 'empty' => ''], 'post_count' => '3', 'found_posts' => '7', 'max_num_pages' => '2'];
+
+    $data = detailsOf();
+
+    expect($data['Request'])->toBe('5')
+        ->and($data['Query vars'])->toBe(['a' => 1])
+        ->and($data['Main query'])->toBe(['p' => 4])
+        ->and($data['Main query results'])->toBe('3 of 7 found, 2 page(s)');
+});
+
+it('turns the site WordPress switched away from into a number before asking about it', function (): void {
+    multisiteWith(5, true, ['2']);
+
+    expect(detailsOf()['Site'])->toBe('#2');
+});

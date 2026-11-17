@@ -171,3 +171,29 @@ function recordedCalls(array $calls): RequestRecorder
 
     return $recorder;
 }
+
+final class FakeLooseHooks
+{
+    public function all(): object
+    {
+        return (object) [
+            7 => (object) ['one' => ['handler' => 'seven', 'priority' => '3']],
+            'wp_head' => [['handler' => 'listed', 'priority' => '4']],
+        ];
+    }
+}
+
+it('reads the registrations of a hook service whatever shape it gives them in', function (): void {
+    $GLOBALS['wp_actions'] = ['wp_head' => 1, '7' => 1];
+
+    $rows = (new WpHooksCollector(new RequestRecorder, [new FakeLooseHooks]))->collect()['data']['data'];
+
+    expect($rows['wp_head']['pollora'])->toBe('listed @4')
+        ->and($rows['7']['pollora'])->toBe('seven @3');
+});
+
+it('shows a hook whose number name WordPress gave it as text, and counts as a number', function (): void {
+    $GLOBALS['wp_actions'] = ['init' => '3'];
+
+    expect((new WpHooksCollector(new RequestRecorder))->collect()['data']['data']['init']['calls'])->toBe(3);
+});

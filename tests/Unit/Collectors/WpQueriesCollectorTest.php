@@ -211,3 +211,45 @@ it('counts every failed query, each once', function (): void {
 
     expect(queriesFrom(new WpQueriesCollector)['nb_failed_statements'])->toBe(2);
 });
+
+it('reads a query as WordPress keeps it, whatever the types, and a query missing its fields as an empty one', function (): void {
+    $GLOBALS['wpdb']->queries = [[5, '0.5', 123, 1.0, ['other' => 1]], [], ['SELECT 1']];
+
+    $statements = queriesFrom(new WpQueriesCollector)['statements'];
+
+    expect($statements[0]['sql'])->toBe('5')
+        ->and($statements[0]['duration'])->toBe(0.5)
+        ->and($statements[0]['backtrace'])->toBe(['123'])
+        ->and($statements[0]['row_count'])->toBeNull()
+        ->and($statements[0]['connection'])->toBe('wpdb')
+        ->and($statements[1]['sql'])->toBe('')
+        ->and($statements[1]['duration'])->toBe(0.0)
+        ->and($statements[1]['backtrace'])->toBe([])
+        ->and($statements[1]['filename'])->toBe('')
+        ->and($statements[2]['duration'])->toBe(0.0);
+});
+
+it('reads a caller string without empty parts or stray spaces, innermost first and as a list', function (): void {
+    $GLOBALS['wpdb']->queries = [['a', 0.1, ' x ,, y ,z,', 1.0]];
+
+    expect(queriesFrom(new WpQueriesCollector)['statements'][0]['backtrace'])->toBe(['z', 'y', 'x']);
+});
+
+it('rounds the position and width of each query on the timeline to three decimals', function (): void {
+    $GLOBALS['wpdb']->queries = [['a', 1, '', 1.0], ['b', 2, '', 1.0]];
+
+    $statements = queriesFrom(new WpQueriesCollector)['statements'];
+
+    expect(array_column($statements, 'start_percent'))->toBe([0.0, 33.333])
+        ->and(array_column($statements, 'width_percent'))->toBe([33.333, 66.667]);
+});
+
+it('keeps the query list in step with what was excluded, counting from the first', function (): void {
+    $GLOBALS['wpdb']->queries = [['a', 0.1, '', 1.0], ['b', 0.1, '', 1.0], ['c', 0.1, '', 1.0], ['d', 0.1, '', 1.0]];
+
+    $data = queriesFrom(new WpQueriesCollector(hardLimit: 1));
+
+    expect($data['nb_statements'])->toBe(1)
+        ->and($data['nb_excluded_statements'])->toBe(3)
+        ->and($data['accumulated_duration'])->toEqualWithDelta(0.1, 0.0001);
+});
