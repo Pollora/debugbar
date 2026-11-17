@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Brain\Monkey\Actions;
 use Brain\Monkey\Filters;
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
+use Illuminate\Support\Facades\Exceptions;
 use Pollora\Debugbar\Http\WordPressExitResponder;
 
 require_once __DIR__.'/../Fixtures/wordpress.php';
@@ -142,4 +143,57 @@ it('leaves a response that is not a REST response alone', function (): void {
     $debugbar = $this->collectingDebugbar();
 
     expect(responderFor($debugbar)['responder']->tagRestResponse('not a response'))->toBe('not a response');
+});
+
+describe('the redirect and shutdown hooks', function (): void {
+    it('stacks a redirect to a real location, with its status as a number, and none to an empty one', function (): void {
+        if (headers_sent()) {
+            $this->markTestSkipped('Output has started: the bar cannot set its cookie.');
+        }
+
+        $redirect = null;
+        Filters\expectAdded('wp_redirect')->once()->whenHappen(function (callable $callback) use (&$redirect): void {
+            $redirect = $callback;
+        });
+        $debugbar = $this->collectingDebugbar();
+        responderFor($debugbar)['responder']->install();
+
+        $redirect('', 302);
+        $redirect(false, 302);
+
+        expect(collect($debugbar->getCollector('messages')->getMessages())->pluck('message')->all())->toBe([]);
+
+        $returned = $redirect('https://site.test/next', '301');
+
+        expect($returned)->toBe('https://site.test/next')
+            ->and(collect($debugbar->getCollector('messages')->getMessages())->pluck('message')->all())->toBe(['wp_redirect() 301 to https://site.test/next'])
+            ->and($debugbar->getStorage()->saved)->toHaveCount(1);
+    });
+
+    it('reports what failed while stacking a redirect, without breaking it', function (): void {
+        if (headers_sent()) {
+            $this->markTestSkipped('Output has started: the bar cannot set its cookie.');
+        }
+
+        Exceptions::fake();
+        $debugbar = $this->collectingDebugbar();
+
+        responderFor($debugbar, function (): void {
+            throw new RuntimeException('a collector failed');
+        })['responder']->stackRedirect('https://site.test/next', 302);
+
+        Exceptions::assertReported(fn (RuntimeException $e): bool => $e->getMessage() === 'a collector failed');
+    });
+
+    it('reports what failed while collecting at shutdown, without breaking it', function (): void {
+        Brain\Monkey\Functions\when('wp_doing_ajax')->justReturn(true);
+        Exceptions::fake();
+        $debugbar = $this->collectingDebugbar();
+
+        responderFor($debugbar, function (): void {
+            throw new RuntimeException('a collector failed');
+        })['responder']->collect();
+
+        Exceptions::assertReported(fn (RuntimeException $e): bool => $e->getMessage() === 'a collector failed');
+    });
 });

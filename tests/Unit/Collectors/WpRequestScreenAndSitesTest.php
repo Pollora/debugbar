@@ -10,23 +10,7 @@ use Pollora\Debugbar\Recording\RequestRecorder;
 use Pollora\Debugbar\Recording\SiteRecorder;
 use Pollora\Debugbar\Support\Components;
 
-if (! class_exists(WP_Screen::class)) {
-    class WP_Screen
-    {
-        public string $id = 'edit-post';
-
-        public string $base = 'edit';
-
-        public string $post_type = 'post';
-
-        public string $taxonomy = '';
-
-        public function is_block_editor(): bool
-        {
-            return false;
-        }
-    }
-}
+require_once __DIR__.'/../../Fixtures/wordpress.php';
 
 function requestDataWith(?SiteRecorder $sites = null): array
 {

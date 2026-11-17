@@ -73,3 +73,22 @@ it('gives its tab the address to call and a widget of its own, inlined', functio
         ->and($collector->getWidgets()['pollora_doctor']['widget'])->toBe('PhpDebugBar.Widgets.PolloraDoctorWidget')
         ->and($collector->getAssets()['inline_js']['pollora-doctor-widget'])->toContain('PolloraDoctorWidget');
 });
+
+it('lists errors, then warnings, then passes, then skipped checks, with everything each one says', function (): void {
+    $this->app->instance(Doctor::class, new Doctor([
+        check('skipped', CheckResult::skipped('Not here.')),
+        check('fine', CheckResult::ok('Fine.', ['one'])),
+        check('warned', CheckResult::warning('Careful.', ['two'], 'Do this.')),
+        check('broken', CheckResult::error('Broken.', ['three'], 'Fix that.')),
+    ]));
+    config(['debugbar.force_allow_enable' => true, 'debugbar.enabled' => true, 'debugbar.storage.open' => true]);
+    $this->collectingDebugbar();
+
+    $checks = $this->getJson('_debugbar/pollora/doctor')->assertOk()->json('checks');
+
+    expect(array_column($checks, 'status'))->toBe(['error', 'warning', 'ok', 'skipped'])
+        ->and($checks[0])->toBe(['id' => 'broken', 'label' => 'Broken', 'status' => 'error', 'summary' => 'Broken.', 'details' => ['three'], 'fix' => 'Fix that.'])
+        ->and($checks[1])->toBe(['id' => 'warned', 'label' => 'Warned', 'status' => 'warning', 'summary' => 'Careful.', 'details' => ['two'], 'fix' => 'Do this.'])
+        ->and($checks[2])->toBe(['id' => 'fine', 'label' => 'Fine', 'status' => 'ok', 'summary' => 'Fine.', 'details' => ['one'], 'fix' => null])
+        ->and($checks[3]['id'])->toBe('skipped');
+});

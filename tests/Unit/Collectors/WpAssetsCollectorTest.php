@@ -127,3 +127,55 @@ it('skips the modules when the registry cannot tell its queue', function (): voi
 
     expect(assetRows())->toBe([]);
 });
+
+it('lists a handle that was only printed, as a dependency pulled in by another', function (): void {
+    enqueue($GLOBALS['wp_scripts'], 'app', 'https://site.test/app.js', ['dep'], printed: true);
+    $GLOBALS['wp_scripts']->registered['dep'] = new _WP_Dependency('dep', 'https://site.test/dep.js', [], false, null);
+    $GLOBALS['wp_scripts']->done = ['dep', 'app'];
+
+    $rows = assetRows();
+
+    expect(array_keys($rows))->toBe(['script: app', 'script: dep'])
+        ->and($rows['script: dep'])->toBe(['printed' => 'header', 'source' => '/dep.js', 'dependencies' => '', 'note' => ''])
+        ->and($rows['script: app']['printed'])->toBe('header');
+});
+
+it('shows a queued handle nobody registered as an empty row, and reads a footer group given as text', function (): void {
+    $GLOBALS['wp_scripts']->queue = ['ghost', 'late'];
+    enqueue($GLOBALS['wp_scripts'], 'late', 'https://site.test/late.js', printed: true);
+    $GLOBALS['wp_scripts']->registered['late']->extra['group'] = '1';
+
+    $rows = assetRows();
+
+    expect($rows['script: ghost'])->toBe(['printed' => 'no', 'source' => '', 'dependencies' => '', 'note' => ''])
+        ->and($rows['script: late']['printed'])->toBe('footer');
+});
+
+it('shows a module nobody registered with empty fields', function (): void {
+    Functions\when('wp_script_modules')->justReturn(new class
+    {
+        public function get_queue(): array
+        {
+            return ['@acme/solo'];
+        }
+    });
+
+    expect(assetRows()['module: @acme/solo'])->toBe(['printed' => '', 'source' => '', 'dependencies' => '', 'note' => 'not registered']);
+});
+
+it('shows a header module with no dependency', function (): void {
+    Functions\when('wp_script_modules')->justReturn(new class
+    {
+        public function get_queue(): array
+        {
+            return ['@acme/head'];
+        }
+
+        public function get_registered(string $id): array
+        {
+            return ['src' => 'https://cdn.test/head.js', 'in_footer' => false, 'dependencies' => []];
+        }
+    });
+
+    expect(assetRows()['module: @acme/head'])->toBe(['printed' => 'header', 'source' => 'https://cdn.test/head.js', 'dependencies' => '', 'note' => '']);
+});
