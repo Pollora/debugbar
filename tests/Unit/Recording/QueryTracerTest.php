@@ -240,3 +240,30 @@ it('reports the rows a query affected, else the rows it returned, else none', fu
         expect($GLOBALS['wpdb']->queries[0][4][QueryTracer::KEY]['rows'])->toBe($expected, $label);
     }
 });
+
+it('attributes a query from the thirty innermost frames of its trace, no more and no fewer', function (): void {
+    require_once __DIR__.'/../../Fixtures/tracer-frame.php';
+
+    $hooks = tracerHooks(new QueryTracer(components: new Components([
+        dirname(__DIR__, 2).'/Fixtures/' => ['kind' => 'plugin', 'name' => 'fixture'],
+        dirname(__DIR__, 2).'/' => ['kind' => 'app', 'name' => ''],
+    ])));
+    $inner = static fn (): array => $hooks['log_query_custom_data']([]);
+    $deep = function (int $depth) use (&$deep, $inner): array {
+        return $depth === 0 ? $inner() : $deep($depth - 1);
+    };
+
+    // The frame in the fixture file is the 30th, then the 31st, from the innermost
+    $kept = tracer_fixture_frame(fn (): array => $deep(27));
+    $dropped = tracer_fixture_frame(fn (): array => $deep(28));
+
+    expect($kept[QueryTracer::KEY]['component'])->toBe('plugin: fixture')
+        ->and($dropped[QueryTracer::KEY]['component'])->toBe('app');
+});
+
+it('keeps a backtrace when WordPress has no query list and the soft limit is zero, which keeps none', function (): void {
+    $GLOBALS['wpdb'] = null;
+    $hooks = tracerHooks(new QueryTracer(softLimit: 0));
+
+    expect($hooks['log_query_custom_data']([])[QueryTracer::KEY])->toBe(['frames' => []]);
+});

@@ -11,6 +11,9 @@ use Pollora\Discovery\Domain\Contracts\DiscoveryEngineInterface;
 use Pollora\Discovery\Infrastructure\Services\DiscoveryEngine;
 use Pollora\Hook\Infrastructure\Services\AsyncInspector;
 use Pollora\Modules\Application\Services\ModuleStates;
+use Pollora\Route\Application\Services\AnsweringTemplate;
+use Pollora\Route\Domain\Enums\TemplateOutcome;
+use Pollora\Route\Domain\Models\TemplateResolution;
 use Pollora\Route\Infrastructure\Models\Route as PolloraRoute;
 
 /**
@@ -216,4 +219,124 @@ it('reports how WordPress is configured, from its environment and database', fun
         ->and($wordpress['web server'])->toBe('nginx/1.27')
         ->and($wordpress['constants'])->toHaveKeys(['WP_DEBUG', 'SAVEQUERIES'])
         ->and($wordpress['drop-ins'])->toBe('none');
+});
+
+it('shows the template that answered, with every fact of its resolution', function (): void {
+    $answering = new AnsweringTemplate;
+    $answering->record(new TemplateResolution(
+        template: '/elsewhere/single.blade.php',
+        condition: 'is_single',
+        view: 'single',
+        usedIndexFallback: true,
+        outcome: TemplateOutcome::View,
+    ));
+    $container = new Container;
+    $container->instance(AnsweringTemplate::class, $answering);
+
+    expect(partsOf($container)['Template'])->toBe([
+        'file' => '/elsewhere/single.blade.php',
+        'view' => 'single',
+        'condition' => 'is_single',
+        'index fallback' => true,
+        'outcome' => 'view',
+    ]);
+});
+
+it('lists every scan of discovery with its path, source, structures and time, and adds up the time', function (): void {
+    $cache = new class
+    {
+        public function isCacheEnabled(): bool
+        {
+            return false;
+        }
+
+        public function scans(): array
+        {
+            return [
+                ['path' => '/app/Http', 'source' => 'scan', 'structures' => 3, 'milliseconds' => 1.25],
+                ['path' => '/app/Models', 'source' => 'cache', 'structures' => 12, 'milliseconds' => 2.5],
+            ];
+        }
+    };
+    $engine = new class($cache)
+    {
+        public function __construct(private object $cache) {}
+
+        public function getCacheManager(): object
+        {
+            return $this->cache;
+        }
+    };
+    $container = new Container;
+    $container->instance(DiscoveryManager::class, new class($engine)
+    {
+        public function __construct(private object $engine) {}
+
+        public function getEngine(): object
+        {
+            return $this->engine;
+        }
+    });
+
+    expect(partsOf($container)['Discovery'])->toBe([
+        'persistent cache' => 'off (debug mode)',
+        'time' => '3.8 ms',
+        'locations' => [
+            '/app/Http · scan · 3 structures · 1.2 ms',
+            '/app/Models · cache · 12 structures · 2.5 ms',
+        ],
+    ]);
+});
+
+it('says the discovery cache is on when it is, and takes a cache that cannot tell its scans as having none', function (): void {
+    $cache = new class
+    {
+        public function isCacheEnabled(): bool
+        {
+            return true;
+        }
+    };
+    $engine = new class($cache)
+    {
+        public function __construct(private object $cache) {}
+
+        public function getCacheManager(): object
+        {
+            return $this->cache;
+        }
+    };
+    $container = new Container;
+    $container->instance(DiscoveryManager::class, new class($engine)
+    {
+        public function __construct(private object $engine) {}
+
+        public function getEngine(): object
+        {
+            return $this->engine;
+        }
+    });
+
+    expect(partsOf($container)['Discovery'])->toBe(['persistent cache' => 'on', 'time' => '0.0 ms', 'locations' => []]);
+});
+
+it('writes the name and version of the theme as text, whatever it reads', function (): void {
+    Functions\when('wp_get_theme')->justReturn(new class
+    {
+        public function get(string $header): mixed
+        {
+            return ['Name' => 12, 'Version' => 3][$header];
+        }
+
+        public function get_stylesheet(): string
+        {
+            return 's';
+        }
+
+        public function get_template(): string
+        {
+            return 't';
+        }
+    });
+
+    expect(partsOf(new Container)['Theme'])->toBe(['name' => '12', 'version' => '3', 'stylesheet' => 's', 'template' => 't']);
 });

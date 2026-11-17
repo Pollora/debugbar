@@ -420,3 +420,30 @@ it('shows at least one row even when the limit is zero', function (): void {
 
     expect($rows)->toHaveCount(1);
 });
+
+it('credits the time of a callback to the callback that fired it, three levels deep', function (): void {
+    $timer = new HookTimer;
+    $call = static fn (string $hook): mixed => $GLOBALS['wp_filter'][$hook]->callbacks[10]['cb']['function']();
+    $GLOBALS['wp_filter']['a'] = (object) ['callbacks' => [10 => ['cb' => ['function' => static function () use ($call): void {
+        usleep(1000);
+        $call('b');
+    }, 'accepted_args' => 1]]]];
+    $GLOBALS['wp_filter']['b'] = (object) ['callbacks' => [10 => ['cb' => ['function' => static function () use ($call): void {
+        usleep(2000);
+        $call('c');
+    }, 'accepted_args' => 1]]]];
+    $GLOBALS['wp_filter']['c'] = (object) ['callbacks' => [10 => ['cb' => ['function' => static function (): void {
+        usleep(4000);
+    }, 'accepted_args' => 1]]]];
+
+    foreach (['a', 'b', 'c'] as $hook) {
+        $timer->wrap($hook);
+    }
+
+    $call('a');
+    $byHook = array_column($timer->timings(), null, 'hook');
+
+    expect($byHook['a']['self'] + $byHook['b']['total'])->toBe($byHook['a']['total'])
+        ->and($byHook['b']['self'] + $byHook['c']['total'])->toBe($byHook['b']['total'])
+        ->and($byHook['c']['self'])->toBe($byHook['c']['total']);
+});
