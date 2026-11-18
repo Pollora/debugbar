@@ -39,6 +39,17 @@ WordPress queries are traced through core's `log_query_custom_data` and `query` 
 
 Configuration: `php artisan vendor:publish --tag=debugbar-pollora-config`.
 
+### Who sees the bar
+
+The environment alone does not say who may look: on a staging site in debug mode every visitor would see SQL queries, options and paths. The bar, its wp-admin entry, the data it collects and its endpoints are therefore reserved to signed-in users holding a WordPress capability, `manage_options` by default:
+
+```php
+// config/debugbar-pollora.php, or DEBUGBAR_POLLORA_CAPABILITY=edit_posts
+'capability' => 'manage_options',
+```
+
+Anyone else gets no bar, nothing is collected or stored for their request, and Debugbar's endpoints (stored requests, assets, query explain) and the doctor answer `403`. The check runs from `init`, once WordPress knows the user, and fails closed. Production stays off whatever the capability.
+
 ## Adding your own data
 
 Tabs from Pollora, WordPress and third parties are told apart: Pollora's tab comes first, WordPress's are prefixed `WP`, and everyone else's come last. Names starting with `wp_` or `pollora` are reserved.
