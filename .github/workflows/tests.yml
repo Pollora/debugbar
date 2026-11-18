@@ -158,6 +158,8 @@ jobs:
         working-directory: packages/debugbar/tests/e2e
         env:
           E2E_HOME_URL: https://pollora-debugbar.ddev.site
+          E2E_ADMIN_USER: admin
+          E2E_ADMIN_PASSWORD: pollora-ci-password
         run: npx playwright test
 
       - name: Upload the browser test report

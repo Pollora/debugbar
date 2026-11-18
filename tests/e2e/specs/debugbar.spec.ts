@@ -170,3 +170,16 @@ test('prints no second bar inside the Site Editor canvas', async ({ page }) => {
     await expect(canvas.locator('body')).toBeVisible({ timeout: 15_000 });
     await expect(canvas.locator('.phpdebugbar')).toHaveCount(0);
 });
+
+test('shows no debug bar to a visitor who is not logged in', async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+
+    await page.goto(baseURL ?? '');
+    await page.waitForLoadState('load');
+
+    expect(await page.evaluate(() => 'phpdebugbar' in window)).toBe(false);
+    expect(await page.locator('.phpdebugbar').count()).toBe(0);
+
+    await context.close();
+});
