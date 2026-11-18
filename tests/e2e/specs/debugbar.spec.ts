@@ -61,7 +61,13 @@ test('lists a REST call made from the page among the bar’s requests', async ({
     await page.goto('');
     await debugbar(page);
 
-    const status = await page.evaluate(async () => (await fetch('/wp-json/wp/v2/posts')).status);
+    // A logged-in REST call carries the REST nonce, as the block editor's calls do: without it
+    // WordPress treats the request as anonymous, and the bar is not shown to an anonymous user.
+    const status = await page.evaluate(async () => {
+        const nonce = await (await fetch('/cms/wp-admin/admin-ajax.php?action=rest-nonce')).text();
+
+        return (await fetch('/wp-json/wp/v2/posts', { headers: { 'X-WP-Nonce': nonce } })).status;
+    });
     expect(status).toBe(200);
 
     await expect.poll(async () => page.evaluate(
@@ -97,7 +103,8 @@ test('lists the HTTP calls, transients and capability checks of the request', as
 
     expect(data.wp_http.data.data['1. GET https://api.acme.test/stock'].result).toBe('200 (answered by pre_http_request)');
     expect(JSON.stringify(data.wp_cache.data['Transients set'])).toContain('acme_rates');
-    expect(data.wp_capabilities.data.data.edit_posts.result).toBe('refused');
+    // The tests are logged in as the administrator, who holds the capability the fixture asks for.
+    expect(data.wp_capabilities.data.data.edit_posts.result).toBe('granted');
 });
 
 test('shows the blocks of a post and the theme’s Vite build', async ({ page }) => {
