@@ -4,6 +4,7 @@
         "config:debugbar-pollora.admin": "key",
         "config:debugbar-pollora.admin.enabled": "key",
         "config:debugbar-pollora.admin.hidden_collectors": "key",
+        "config:debugbar-pollora.capability": "key",
         "config:debugbar-pollora.collectors": "key",
         "config:debugbar-pollora.collectors.bridges": "key",
         "config:debugbar-pollora.collectors.doctor": "key",

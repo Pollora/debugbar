@@ -6,8 +6,10 @@ namespace Pollora\Debugbar\Http;
 
 use Fruitcake\LaravelDebugbar\LaravelDebugbar;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Pollora\Debugbar\Activation;
 use Pollora\Doctor\Application\Services\Doctor;
 use Pollora\Doctor\Domain\Enums\RunContext;
 
@@ -16,13 +18,19 @@ use Pollora\Doctor\Domain\Enums\RunContext;
  *
  * Nothing runs with the page: the checks cost more than a request should, so
  * they run on demand, here. Guarded as Debugbar guards its stored requests:
- * the bar must be on, and the caller on a local or private address unless
+ * the bar must be on, the user must have the `debugbar-pollora.capability`, and the caller on a local or private address unless
  * the storage was opened on purpose.
  */
 final class DoctorController
 {
     public function __invoke(Request $request, LaravelDebugbar $debugbar, Container $container): JsonResponse
     {
+        $app = $container->make(Application::class);
+
+        if (! Activation::mayView($app)) {
+            return new JsonResponse(['message' => 'The doctor needs the '.Activation::capability($app).' capability.'], 403);
+        }
+
         if (! $debugbar->isStorageOpen($request)) {
             return new JsonResponse(['message' => 'The doctor answers local and private addresses only, as Debugbar\'s stored requests do (debugbar.storage.open).'], 403);
         }

@@ -7,6 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  * and the fixtures in ./fixtures copied to its mu-plugins.
  *
  * E2E_HOME_URL   the site's front end, e.g. https://pollora-debugbar.ddev.site
+ * E2E_ADMIN_USER / E2E_ADMIN_PASSWORD   the administrator the tests log in as (the bar is reserved to a capability)
  */
 const homeUrl = process.env.E2E_HOME_URL ?? 'https://pollora-debugbar.ddev.site';
 
@@ -24,6 +25,7 @@ if (! process.env.NODE_EXTRA_CA_CERTS) {
 }
 
 export default defineConfig({
+    globalSetup: './global-setup.ts',
     testDir: './specs',
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
@@ -33,6 +35,8 @@ export default defineConfig({
     use: {
         baseURL: `${homeUrl}/`,
         ignoreHTTPSErrors: true,
+        // Logged in as the administrator: the bar is not shown to anyone else.
+        storageState: './.auth/admin.json',
         trace: 'retain-on-failure',
     },
     projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

@@ -27,6 +27,9 @@ uses()
 uses(TestCase::class)
     ->beforeEach(function (): void {
         Brain\Monkey\setUp();
+        // Feature tests run as a user who may see the bar; the capability
+        // tests say otherwise for themselves
+        Brain\Monkey\Functions\when('current_user_can')->justReturn(true);
     })
     ->afterEach(function (): void {
         Brain\Monkey\tearDown();
