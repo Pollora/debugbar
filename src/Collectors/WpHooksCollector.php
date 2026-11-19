@@ -79,7 +79,7 @@ final class WpHooksCollector extends Collector
         return match (true) {
             $callback instanceof TimedCallback => self::describe($callback->callback),
             is_string($callback) => $callback,
-            is_array($callback) && isset($callback[0], $callback[1]) => (is_object($callback[0]) ? $callback[0]::class : (string) $callback[0]).'::'.(string) $callback[1],
+            is_array($callback) && isset($callback[0], $callback[1]) => (is_object($callback[0]) ? $callback[0]::class : (string) $callback[0]).'::'.$callback[1],
             $callback instanceof \Closure => self::describeClosure($callback),
             is_object($callback) => $callback::class,
             default => 'unknown',
@@ -130,7 +130,7 @@ final class WpHooksCollector extends Collector
         // A file included from a method (a mu-plugin WordPress loads from
         // Pollora's Bootstrap) gives its closures that class's scope: name
         // the class only when the closure is written in it
-        $scope = $scopeClass !== null && $scopeClass->getFileName() === $reflection->getFileName() ? $scopeClass->getName() : null;
+        $scope = $scopeClass instanceof \ReflectionClass && $scopeClass->getFileName() === $reflection->getFileName() ? $scopeClass->getName() : null;
 
         if (! str_contains($reflection->getName(), '{closure')) {
             return $scope !== null ? "{$scope}::{$reflection->getName()}" : $reflection->getName();

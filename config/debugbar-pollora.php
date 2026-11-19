@@ -19,6 +19,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Who sees the bar
+    |--------------------------------------------------------------------------
+    |
+    | The environment alone does not say who may look: on a staging site in
+    | debug mode every visitor would see SQL queries, options and paths. Only
+    | a signed-in user with this WordPress capability gets the bar, its
+    | wp-admin entry and what it collected; everyone else gets none of it, and
+    | Debugbar's endpoints (stored requests, the doctor...) answer 403.
+    |
+    */
+
+    'capability' => env('DEBUGBAR_POLLORA_CAPABILITY', 'manage_options'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tabs
     |--------------------------------------------------------------------------
     |

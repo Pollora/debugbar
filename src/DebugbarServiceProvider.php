@@ -11,6 +11,7 @@ use Pollora\BlockBinding\Domain\Events\BindingResolved;
 use Pollora\Debugbar\Bridges\MessageBridge;
 use Pollora\Debugbar\Http\AdminBarRenderer;
 use Pollora\Debugbar\Http\DoctorController;
+use Pollora\Debugbar\Http\RequireCapability;
 use Pollora\Debugbar\Http\WordPressExitResponder;
 use Pollora\Debugbar\Recording\AsyncRecorder;
 use Pollora\Debugbar\Recording\BlockRecorder;
@@ -65,6 +66,14 @@ final class DebugbarServiceProvider extends ServiceProvider
             define('SAVEQUERIES', true);
         }
 
+        // Debugbar's own endpoints (stored requests, assets, cache, explain)
+        // answer 403 to a user without the capability, before anything else
+        $routeMiddleware = (array) $config->get('debugbar.route_middleware', []);
+
+        if (! in_array(RequireCapability::class, $routeMiddleware, true)) {
+            $config->set('debugbar.route_middleware', [...$routeMiddleware, RequireCapability::class]);
+        }
+
         $on = static fn (string $collector): bool => (bool) $config->get("debugbar-pollora.collectors.{$collector}", true);
 
         $admin = $config->get('debugbar-pollora.admin.enabled', true) && AdminBarRenderer::isAdminPage();
@@ -95,6 +104,16 @@ final class DebugbarServiceProvider extends ServiceProvider
         }
 
         $this->app->make('events')->listen(WordPressBooting::class, function () use ($config, $on, $admin): void {
+            // The user is known from `init` on: a user without the capability
+            // gets no bar injected, nothing stored, and no data collected
+            if (function_exists('add_action')) {
+                add_action('init', function (): void {
+                    if (! Activation::mayView($this->app) && $this->app->bound(LaravelDebugbar::class)) {
+                        $this->app->make(LaravelDebugbar::class)->disable();
+                    }
+                }, 0, 0);
+            }
+
             $this->app->make(RequestRecorder::class)->install(
                 countAllHooks: (bool) $config->get('debugbar-pollora.options.wp_hooks.count_filters', false),
             );
@@ -164,11 +183,12 @@ final class DebugbarServiceProvider extends ServiceProvider
     }
 
     /**
-     * The bar, when it is enabled and has booted; null otherwise.
+     * The bar, when it is enabled, has booted and the current user may see it;
+     * null otherwise.
      */
     private function collectingDebugbar(): ?LaravelDebugbar
     {
-        if (! $this->app->bound(LaravelDebugbar::class)) {
+        if (! $this->app->bound(LaravelDebugbar::class) || ! Activation::mayView($this->app)) {
             return null;
         }
 

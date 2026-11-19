@@ -1,0 +1,11 @@
+# Changelog
+
+All notable changes to this package are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+## [1.1.0] - 2026-11-19
+
+### Security
+
+- The bar is now reserved to signed-in users holding a WordPress capability, `manage_options` by default (`debugbar-pollora.capability`, `DEBUGBAR_POLLORA_CAPABILITY`). Until now only the environment (`APP_DEBUG` / `DEBUGBAR_ENABLED`, never production) and a local address guarded it, so on a staging site in debug mode any visitor saw SQL queries, options and file paths. A user without the capability gets no bar (front end or wp-admin), nothing collected or stored for their request, no `phpdebugbar-id` header, and a 403 from Debugbar's endpoints (stored requests, assets, cache, query explain) and from the doctor. The check fails closed: without WordPress, or with a blank setting, the default capability applies. The console and the test suite are unchanged.

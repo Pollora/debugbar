@@ -94,3 +94,79 @@ it('installs once', function (): void {
 
     expect($recorder->isInstalled())->toBeTrue();
 });
+
+it('counts the calls of every hook, and answers the counts only once there are some', function (): void {
+    $hooks = captureHooks();
+    $recorder = new RequestRecorder;
+    $recorder->install(true);
+
+    expect($recorder->hookCalls())->toBeNull();
+
+    $hooks['all']('init');
+    $hooks['all']('init');
+    $hooks['all']('wp_head');
+
+    expect($recorder->hookCalls())->toBe(['init' => 2, 'wp_head' => 1]);
+});
+
+it('registers its hook counter with the default priority and one argument', function (): void {
+    $arguments = null;
+    Actions\expectAdded('all')->once()->whenHappen(function (callable $callback, int $priority, int $accepted) use (&$arguments): void {
+        $arguments = [$priority, $accepted];
+    });
+
+    (new RequestRecorder)->install(true);
+
+    expect($arguments)->toBe([10, 1]);
+});
+
+it('keeps the first start of a phase, moves its end on each end, and ignores an end with no start', function (): void {
+    $hooks = captureHooks();
+    $recorder = new RequestRecorder;
+    $recorder->install();
+
+    $hooks['init@'.PHP_INT_MAX]();
+
+    expect($recorder->phases())->toBe([]);
+
+    $hooks['init@'.PHP_INT_MIN]();
+    $first = $recorder->phases()['init'];
+    usleep(1000);
+    $hooks['init@'.PHP_INT_MIN]();
+
+    expect($recorder->phases()['init'])->toBe($first)
+        ->and($first['end'])->toBeGreaterThanOrEqual($first['start'])
+        ->and($first['end'] - $first['start'])->toBeLessThan(0.5)
+        ->and($first['start'])->toBeFloat()->toBeGreaterThan(1_000_000_000);
+
+    usleep(1000);
+    $hooks['init@'.PHP_INT_MAX]();
+
+    expect($recorder->phases()['init']['end'])->toBeGreaterThan($first['end'])
+        ->and($recorder->phases()['init']['start'])->toBe($first['start']);
+});
+
+it('keeps only the templates that are scalars, as strings and in order', function (): void {
+    $hooks = captureHooks();
+    $recorder = new RequestRecorder;
+    $recorder->install();
+
+    $hooks['single_template_hierarchy'](['single.php', 5, ['nested'], null, 'index.php']);
+    expect($recorder->hierarchies())->toBe(['single' => ['single.php', '5', 'index.php']]);
+
+    $hooks['single_template_hierarchy']('not a list');
+
+    expect($recorder->hierarchies())->toBe(['single' => ['single.php', '5', 'index.php']]);
+});
+
+it('keeps the last template WordPress settled on, and ignores one that is empty or not a string', function (): void {
+    $hooks = captureHooks();
+    $recorder = new RequestRecorder;
+    $recorder->install();
+
+    $hooks['template_include']('/a.php');
+    $hooks['template_include']('');
+    $hooks['template_include'](false);
+
+    expect($recorder->template())->toBe('/a.php');
+});
