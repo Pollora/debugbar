@@ -137,11 +137,21 @@ test('runs the doctor on demand from its tab', async ({ page }) => {
 });
 
 async function logIn(page: Page): Promise<void> {
-    await page.goto('cms/wp-login.php');
-    await page.fill('#user_login', process.env.E2E_ADMIN_USER ?? 'admin');
-    await page.fill('#user_pass', process.env.E2E_ADMIN_PASSWORD ?? 'pollora-ci-password');
-    await page.click('#wp-submit');
-    await page.waitForURL(/wp-admin/);
+    const username = process.env.E2E_ADMIN_USER ?? 'admin';
+    const password = process.env.E2E_ADMIN_PASSWORD ?? 'pollora-ci-password';
+
+    await page.goto('cms/wp-login.php', { waitUntil: 'networkidle' });
+
+    // In a failing run the form was never submitted: no request left the page, and the password field,
+    // which is `required`, was empty when the button was clicked (the browser then refuses to send it).
+    // The fields are filled again until both values are there, then the form is sent.
+    await expect(async () => {
+        await page.fill('#user_login', username);
+        await page.fill('#user_pass', password);
+        await expect(page.locator('#user_pass')).toHaveValue(password);
+    }).toPass({ timeout: 10_000 });
+
+    await Promise.all([page.waitForURL(/wp-admin/), page.click('#wp-submit')]);
 }
 
 test('shows the bar on wp-admin pages, with the admin screen and without Laravel-only tabs', async ({ page }) => {
