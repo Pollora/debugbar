@@ -4,6 +4,12 @@ All notable changes to this package are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-19
+
+### Changed
+
+- The quality workflow runs the harness at v0.1.32 (it ran v0.1.30), and `composer.json` requires `pollora/harness` `^0.1.32`. No change to the code of the package.
+
 ## [1.1.0] - 2026-11-19
 
 ### Security
