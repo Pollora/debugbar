@@ -84,10 +84,8 @@ describe('when no Laravel route answered', function (): void {
 describe('discovery', function (): void {
     function discoveryContainer(DiscoveryEngineInterface $engine): Container
     {
-        $manager = Mockery::mock(DiscoveryManager::class);
-        $manager->shouldReceive('getEngine')->andReturn($engine);
         $container = new Container;
-        $container->instance(DiscoveryManager::class, $manager);
+        $container->instance(DiscoveryManager::class, new DiscoveryManager($engine));
 
         return $container;
     }
