@@ -22,7 +22,7 @@
         "pollora/framework": "^13.36.0"
     },
     "require-dev": {
-        "antecedent/patchwork": "^2.2",
+        "antecedent/patchwork": "dev-master#d588654e5c1304810b038db2b5c98d39b6f76c61 as 2.2.6",
         "brain/monkey": "^2.7",
         "johnbillion/extended-cpts": "^5.0.3",
         "laravel/pint": "^1.22",
@@ -31,7 +31,7 @@
         "pestphp/pest": "^3.8",
         "php-stubs/wordpress-stubs": "^7.1",
         "phpstan/phpstan": "^2.1",
-        "pollora/harness": "^0.1.40",
+        "pollora/harness": "^0.1.41",
         "szepeviktor/phpstan-wordpress": "^2.0"
     },
     "autoload": {
