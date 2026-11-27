@@ -1,4 +1,10 @@
 <p align="center">
+  <a href="https://pollora.dev">
+    <img src="https://raw.githubusercontent.com/Pollora/.github/main/brand/banners/debugbar.png" width="100%" alt="Pollora Debugbar: Queries, hooks and templates in the debug bar">
+  </a>
+</p>
+
+<p align="center">
   <a href="https://packagist.org/packages/pollora/debugbar"><img src="https://img.shields.io/packagist/v/pollora/debugbar" alt="Latest version"></a>
   <a href="https://github.com/Pollora/debugbar/actions/workflows/tests.yml"><img src="https://github.com/Pollora/debugbar/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Pollora/debugbar" alt="License"></a>
